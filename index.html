@@ -1,0 +1,3156 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS Operations Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#13202e; --slate:#3d4f63; --muted:#7a8a9c; --line:#e3e8ee; --line2:#d3dbe4;
+  --bg:#f3f5f8; --card:#ffffff; --card2:#f8f9fb;
+  --teal:#0e7c7b; --teal-dk:#0a5f5e; --teal-bg:#e3f2f1;
+  --amber:#c9821a; --amber-bg:#fdf1de;
+  --red:#c1402f; --red-bg:#fbe9e6;
+  --green:#2f8f5b; --green-bg:#e7f5ed;
+  --yellow:#fde047; --yellow-dk:#a16207;
+  --mono:'IBM Plex Mono',monospace; --disp:'Space Grotesk',sans-serif; --body:'Inter',sans-serif;
+  --radius:10px; --shadow:0 1px 2px rgba(19,32,46,.04), 0 1px 12px rgba(19,32,46,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ── Shell ───────────────────────────────────────── */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--ink);color:#fff;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand-mark{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
+.brand-mark .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 3px rgba(14,124,123,.25)}
+.brand-sub{font-size:10.5px;color:rgba(255,255,255,.45);margin-top:3px;font-family:var(--mono);letter-spacing:.3px}
+.nav{flex:1;padding:14px 10px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.68);font-size:13px;font-weight:500;cursor:pointer;margin-bottom:2px;transition:background .12s,color .12s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(14,124,123,.22);color:#fff}
+.nav-item .ic{width:17px;text-align:center;font-size:14px;flex-shrink:0}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.32);padding:14px 12px 6px;font-weight:600}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;font-family:var(--mono)}
+.sidebar-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;color:rgba(255,255,255,.35)}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h1{font-family:var(--disp);font-size:19px;font-weight:700;letter-spacing:-.2px}
+.topbar .sub{font-size:12px;color:var(--muted);margin-top:1px}
+.content{flex:1;padding:24px 28px;max-width:1400px}
+.page{display:none}
+.page.active{display:block}
+
+/* ── Buttons ─────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;border-radius:8px;font-size:12.5px;font-weight:600;padding:8px 16px;border:1px solid transparent;transition:filter .12s,transform .08s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--teal);color:#fff}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:var(--card);color:var(--slate);border-color:var(--line2)}
+.btn-ghost:hover{background:var(--card2)}
+.btn-danger{background:var(--red-bg);color:var(--red)}
+.btn-danger:hover{filter:brightness(.97)}
+.btn-sm{padding:5px 11px;font-size:11.5px}
+.btn-icon{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:none;border:1px solid var(--line2);color:var(--slate)}
+.btn-icon:hover{background:var(--card2)}
+
+/* ── Cards / Tables ──────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-pad{padding:18px 20px}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius)}
+table.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tbl thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;padding:10px 12px;background:var(--card2);border-bottom:1px solid var(--line);white-space:nowrap}
+table.tbl tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.tbl tbody tr:hover{background:var(--card2)}
+table.tbl tbody tr:last-child td{border-bottom:none}
+
+.inp{width:100%;border:1px solid var(--line2);border-radius:7px;padding:8px 10px;font-size:12.5px;background:var(--card);color:var(--ink);transition:border-color .12s}
+.inp:focus{outline:none;border-color:var(--teal)}
+.inp-group{display:flex;flex-direction:column;gap:4px}
+.inp-lbl{font-size:11px;font-weight:600;color:var(--slate)}
+.full-col{grid-column:1/-1}
+
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.badge-teal{background:var(--teal-bg);color:var(--teal-dk)}
+.badge-amber{background:var(--amber-bg);color:var(--amber)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-gray{background:var(--card2);color:var(--muted)}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(19,32,46,.55);backdrop-filter:blur(3px);z-index:900;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border-radius:14px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(19,32,46,.25)}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.modal-head h2{font-family:var(--disp);font-size:16px;font-weight:700}
+.modal-body{padding:20px 22px}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast-msg{background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:toastIn .2s ease}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-state .ic{font-size:32px;margin-bottom:10px;opacity:.5}
+
+/* Revise highlight */
+.revised-field{background:#fef9c3 !important;border-color:var(--yellow-dk) !important}
+
+/* ── Excel-like editable grid (Shipments) ── */
+table.grid{border-collapse:collapse;font-size:11.5px;white-space:nowrap}
+table.grid thead th{position:sticky;top:0;background:var(--card2);z-index:3;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;padding:8px;border:1px solid var(--line);white-space:nowrap}
+table.grid tbody td{padding:2px 4px;border:1px solid var(--line);vertical-align:middle}
+table.grid tbody tr:hover{background:var(--card2)}
+.gcell{width:100%;border:1px solid transparent;background:transparent;border-radius:5px;padding:4px 6px;font-size:11.5px;color:var(--ink);min-width:64px}
+.gcell:hover{border-color:var(--line2)}
+.gcell:focus{outline:none;border-color:var(--teal);background:#fff}
+input[type=date].gcell{font-family:var(--mono);font-size:10.5px;min-width:118px}
+/* An empty date cell must show NOTHING (no placeholder, no today's-date hint)
+   until it is focused — otherwise blank rows look like they already have a date.
+   Hiding only ::-webkit-datetime-edit blanks the "/" separators but leaves the
+   number fields visible, so every sub-field is made transparent here. */
+input[type=date].gcell.is-empty:not(:focus){color:transparent}
+input[type=date].gcell.is-empty:not(:focus)::-webkit-datetime-edit,
+input[type=date].gcell.is-empty:not(:focus)::-webkit-datetime-edit-fields-wrapper,
+input[type=date].gcell.is-empty:not(:focus)::-webkit-datetime-edit-text,
+input[type=date].gcell.is-empty:not(:focus)::-webkit-datetime-edit-year-field,
+input[type=date].gcell.is-empty:not(:focus)::-webkit-datetime-edit-month-field,
+input[type=date].gcell.is-empty:not(:focus)::-webkit-datetime-edit-day-field{color:transparent}
+input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{opacity:.3}
+.grid-date{width:130px}
+.cutoff-red{background:var(--red-bg)!important}
+.cutoff-yellow{background:#fef08a!important}
+.cutoff-amber{background:var(--amber-bg)!important}
+.cutoff-green{background:var(--green-bg)!important}
+.grid-newrow td{background:#f1faf9}
+.cutoff-warn{color:var(--red);font-weight:800;font-size:14px;line-height:1;cursor:help;flex-shrink:0}
+.ams-alert{background:#ffe0b2 !important;box-shadow:inset 0 0 0 2px var(--amber)}
+.apar-reached{background:#ffe0b2 !important}
+.apar-passed{background:var(--red-bg) !important}
+.folder-chip{border:1px solid var(--line2);background:var(--card);color:var(--slate);border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .12s,border-color .12s}
+.folder-chip:hover{border-color:var(--teal);color:var(--teal-dk)}
+.folder-chip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+.grid tr.row-done td{background:var(--green-bg) !important;box-shadow:none !important}
+.grid tr.row-done .cutoff-warn,.grid tr.row-done .ams-alert{box-shadow:none !important}
+.flt-btn{width:100%;margin-top:5px;border:1px solid var(--line2);border-radius:5px;padding:3px 7px;font-size:10px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:4px;font-family:var(--body)}
+.flt-btn:hover{border-color:var(--teal);color:var(--teal-dk)}
+.flt-btn.active{background:var(--teal-bg);border-color:var(--teal);color:var(--teal-dk)}
+.flt-pop{position:fixed;z-index:1200;background:#fff;border:1px solid var(--line2);border-radius:10px;box-shadow:0 14px 36px rgba(19,32,46,.24);width:240px;max-height:340px;display:flex;flex-direction:column;overflow:hidden}
+.flt-pop .fp-head{padding:9px 10px;border-bottom:1px solid var(--line)}
+.flt-pop .fp-list{overflow-y:auto;padding:4px 0;flex:1}
+.flt-pop label{display:flex;align-items:center;gap:8px;padding:5px 11px;font-size:12px;cursor:pointer}
+.flt-pop label:hover{background:var(--card2)}
+.flt-pop .fp-chk,.flt-pop #fp_all{width:15px;height:15px;accent-color:var(--teal);flex-shrink:0}
+.flt-pop .fp-foot{padding:9px 10px;border-top:1px solid var(--line);display:flex;gap:6px;justify-content:space-between}
+.apar-cell{display:flex;gap:3px;border:none;background:none;padding:2px;cursor:pointer}
+.apar-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;background:var(--card2);color:var(--muted);border:1px solid var(--line2)}
+.apar-badge.on{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+
+@media print{ .no-print{display:none !important} }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<div class="shell">
+  <!-- ═══ SIDEBAR ═══ -->
+  <nav class="sidebar no-print">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>CS Ops Hub</div>
+      <div class="brand-sub">v1.0 · OFFLINE</div>
+    </div>
+    <div class="nav">
+      <div class="nav-section">Shipments</div>
+      <button class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')"><span class="ic">▦</span>Dashboard</button>
+      <button class="nav-item" data-page="shipments" onclick="goPage('shipments')"><span class="ic">📦</span>Shipments</button>
+
+      <div class="nav-section">Documents</div>
+      <button class="nav-item" data-page="documents" onclick="goPage('documents')"><span class="ic">📄</span>Documents</button>
+      <button class="nav-item" data-page="terminals" onclick="goPage('terminals')"><span class="ic">📍</span>Terminal / Depot</button>
+
+      <div class="nav-section">Data</div>
+      <button class="nav-item" data-page="cloud" onclick="goPage('cloud')"><span class="ic">☁️</span>Cloud Sync</button>
+      <button class="nav-item" data-page="backup" onclick="goPage('backup')"><span class="ic">💾</span>Backup / Restore</button>
+    </div>
+    <div class="sidebar-foot"><div id="cloud_foot" style="margin-bottom:4px">⚪ Offline (local only)</div>Data syncs across devices when Cloud is on</div>
+  </nav>
+
+  <!-- ═══ MAIN ═══ -->
+  <div class="main">
+    <div class="topbar no-print">
+      <div>
+        <h1 id="page_title">Dashboard</h1>
+        <div class="sub" id="page_sub">Overview of all shipments and pending actions</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center" id="topbar_actions"></div>
+    </div>
+
+    <div class="content">
+      <!-- ── PAGE: Dashboard ── -->
+      <div class="page active" id="page-dashboard"></div>
+
+      <!-- ── PAGE: Shipments ── -->
+      <div class="page" id="page-shipments"></div>
+      <div class="page" id="page-documents"></div>
+      <div class="page" id="page-cloud"></div>
+
+      <!-- ── PAGE: Terminal/Depot ── -->
+      <div class="page" id="page-terminals"></div>
+
+      <!-- ── PAGE: Cut-off Tracking ── -->
+      <div class="page" id="page-tracking"></div>
+
+      <!-- ── PAGE: Checklists ── -->
+      <div class="page" id="page-checklist"></div>
+
+      <!-- ── PAGE: Backup / Restore ── -->
+      <div class="page" id="page-backup"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast_wrap"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CS OPERATIONS HUB — standalone, offline, localStorage only
+// ═══════════════════════════════════════════════════════
+
+function toast(msg){
+  const wrap = document.getElementById('toast_wrap');
+  const el = document.createElement('div');
+  el.className = 'toast-msg';
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>el.remove(), 3000);
+}
+
+function g(id){ return document.getElementById(id); }
+
+const PAGE_META = {
+  dashboard: {title:'Dashboard', sub:'Overview of all shipments and pending actions'},
+  shipments: {title:'Shipments', sub:'All bookings, organized by month'},
+  documents: {title:'Documents', sub:'Confirmed bookings received from CS — same data, with document names'},
+  cloud:     {title:'Cloud Sync', sub:'เชื่อม Firestore เพื่อแชร์ข้อมูลแบบเรียลไทม์ระหว่างทีม'},
+  terminals: {title:'Terminal / Depot Library', sub:'Saved pickup and turn-in locations for reuse'},
+  tracking:  {title:'Cut-off Tracking', sub:"SI / VGM / Doc / Closing time, ours and the carrier's"},
+  checklist: {title:'CS Checklists', sub:'Per-shipment task checklist'},
+  backup:    {title:'Backup / Restore', sub:'สำรองและกู้คืนข้อมูลทั้งหมดของ CS Ops Hub บนเครื่องนี้'},
+};
+
+function goPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  g('page-'+name).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${name}"]`).classList.add('active');
+  g('page_title').textContent = PAGE_META[name].title;
+  g('page_sub').textContent = PAGE_META[name].sub;
+  g('topbar_actions').innerHTML = '';
+  if(window['render_'+name]) window['render_'+name]();
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA LAYER — localStorage only
+// ═══════════════════════════════════════════════════════
+const LS_SHIPMENTS  = 'cshub_shipments_v1';
+const LS_TERMINALS  = 'cshub_terminals_v1';
+const LS_CHECKLISTS = 'cshub_checklist_templates_v1';
+const LS_PORTS      = 'cshub_ports_v1';
+
+let shipments = [];
+let terminals = [];
+let checklistTemplates = [];
+let ports = [];
+
+function loadAll(){
+  try{ shipments = JSON.parse(localStorage.getItem(LS_SHIPMENTS)||'[]'); }catch(e){ shipments=[]; }
+  try{ terminals = JSON.parse(localStorage.getItem(LS_TERMINALS)||'[]'); }catch(e){ terminals=[]; }
+  try{ checklistTemplates = JSON.parse(localStorage.getItem(LS_CHECKLISTS)||'[]'); }catch(e){ checklistTemplates=[]; }
+  try{ ports = JSON.parse(localStorage.getItem(LS_PORTS)||'[]'); }catch(e){ ports=[]; }
+  // Migrate older shipment records to the new Excel-style grid model: carry the
+  // old single "Final Destination (del)" into the new FPOD column, and make sure
+  // an AP/AR payment object exists so the payment checklist cell always works.
+  shipments.forEach(s=>{
+    if(!s.id) s.id = uid('ship');
+    if(s.fpod === undefined && s.del) s.fpod = s.del;
+    if(!s.payment) s.payment = {ap:false, ar:false};
+    applyAmsDefault(s); // non-US/CA destinations default to NO
+    if(STATUS_MIGRATE[s.status]) s.status = STATUS_MIGRATE[s.status];
+    if(!SHIP_STATUSES.includes(s.status)) s.status = 'In Process';
+    syncAutoStatus(s); // ETD reached -> LOAD
+  });
+  if(!ports.length){
+    ports = ['LAEM CHABANG,THAILAND','LAT KRABANG,THAILAND','BANGKOK,THAILAND','SONGKHLA,THAILAND'];
+  }
+  if(!checklistTemplates.length){
+    checklistTemplates = [
+      {id:'default', name:'Standard Export Checklist', items:[
+        'Pre-Alert sent','Booking confirmed with carrier','SI submitted','VGM submitted','Draft B/L checked',
+        'Customs declaration filed','Container picked up','Gate-in confirmed','Loaded on vessel',
+        'Original B/L released / sent','Invoice issued'
+      ]}
+    ];
+  } else {
+    // Migration: if an existing saved template predates the Pre-Alert item, add it
+    // to the END (not the front) so existing shipments' saved checkmarks — which
+    // are stored by array index — don't shift to the wrong item.
+    checklistTemplates.forEach(tpl=>{
+      if(!tpl.items.some(i => i.toLowerCase().includes('pre-alert'))){
+        tpl.items.push('Pre-Alert sent');
+      }
+    });
+    saveChecklistTemplates();
+  }
+}
+
+function savePorts(){ try{ localStorage.setItem(LS_PORTS, JSON.stringify(ports)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncConfig(); }
+
+// Renders a <select> of saved ports plus an "Other..." option, used by both
+// the Shipment form (POL/POD) and the Booking PDF form (Port of Receive/
+// Discharge/Loading/Final Destination). Values are populated afterwards via
+// setPortField() once the modal is in the DOM (keeps templating simple).
+function portSelectHtml(id){
+  return `
+    <select id="${id}_sel" class="inp" onchange="onPortSelectChange('${id}')" style="margin-bottom:6px">
+      <option value="">— เลือกท่าเรือ —</option>
+      ${ports.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+      <option value="__other__">+ อื่นๆ (พิมพ์เอง)…</option>
+    </select>
+    <div id="${id}_other_wrap" style="display:none;gap:6px">
+      <input id="${id}" class="inp" placeholder="พิมพ์ชื่อท่าเรือ" style="flex:1">
+      <button type="button" class="btn btn-sm btn-ghost" onclick="saveCustomPort('${id}')" title="บันทึกเข้ารายการท่าเรือ">💾</button>
+    </div>
+  `;
+}
+
+// Sets a port field's value after the modal HTML is in the DOM — picks the
+// matching dropdown option if the value is a known port, otherwise switches
+// to the free-text "Other" input.
+window.setPortField = function(id, value){
+  const sel = g(id+'_sel');
+  const wrap = g(id+'_other_wrap');
+  const input = g(id);
+  if(!sel || !input) return;
+  if(value && ports.includes(value)){
+    sel.value = value;
+    wrap.style.display = 'none';
+    input.value = value;
+  } else if(value){
+    sel.value = '__other__';
+    wrap.style.display = 'flex';
+    input.value = value;
+  } else {
+    sel.value = '';
+    wrap.style.display = 'none';
+    input.value = '';
+  }
+};
+
+window.onPortSelectChange = function(id){
+  const sel = g(id+'_sel');
+  const wrap = g(id+'_other_wrap');
+  const input = g(id);
+  if(sel.value === '__other__'){
+    wrap.style.display = 'flex';
+    input.value = '';
+    input.focus();
+  } else {
+    wrap.style.display = 'none';
+    input.value = sel.value;
+  }
+};
+
+// Saves whatever the user typed in the "Other" port field into the shared
+// ports list, so it shows up in the dropdown for future shipments — per
+// request item 3 (applies the same idea to terminals, here for ports).
+window.saveCustomPort = function(id){
+  const val = (g(id)?.value||'').trim();
+  if(!val){ toast('กรุณาพิมพ์ชื่อท่าเรือก่อนบันทึก'); return; }
+  if(!ports.includes(val)){
+    ports.push(val);
+    savePorts();
+    toast('💾 บันทึก "'+val+'" เข้ารายการท่าเรือแล้ว');
+    const sel = g(id+'_sel');
+    if(sel){
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = val;
+      sel.insertBefore(opt, sel.lastElementChild);
+      sel.value = val;
+    }
+  } else {
+    toast('ท่าเรือนี้มีอยู่ในรายการแล้ว');
+  }
+};
+
+
+function saveShipments(){ try{ localStorage.setItem(LS_SHIPMENTS, JSON.stringify(shipments)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncShipments(); }
+function saveTerminals(){ try{ localStorage.setItem(LS_TERMINALS, JSON.stringify(terminals)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncConfig(); }
+function saveChecklistTemplates(){ try{ localStorage.setItem(LS_CHECKLISTS, JSON.stringify(checklistTemplates)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncConfig(); }
+
+/* ===== CLOUD SYNC (Firebase Firestore) =======================================
+   Makes the hub multi-user/online: shipments live in a Firestore collection
+   (one doc per shipment so two people editing different jobs never clobber each
+   other), config (ports/terminals/checklist templates) lives in one meta doc.
+   Everything still works offline on localStorage; cloud layers on top when
+   connected. The Firebase SDK is loaded on demand from the gstatic CDN. */
+const LS_FBCFG = 'cshub_firebase_config';
+// CS Ops Hub runs on its OWN Firebase project (separate from Sea Freight Pro).
+// Paste that project's firebaseConfig in the Cloud Sync page — nothing is
+// embedded here, so there's no default project.
+const DEFAULT_FB_CONFIG = null;
+const LS_FBPREFIX = 'cshub_collection_prefix';
+// CS Ops Hub keeps its data under a prefixed collection so it can safely share a
+// Firestore project with Sea Freight Pro without colliding. Editable in the
+// Cloud Sync page; defaults to "cshub".
+let _collPrefix = (()=>{ try{ return localStorage.getItem(LS_FBPREFIX) || 'cshub'; }catch(e){ return 'cshub'; } })();
+function shipColl(){ return _collPrefix + '_shipments'; }
+function metaColl(){ return _collPrefix + '_meta'; }
+const CLOUD = { app:null, db:null, fs:null, auth:null, authMod:null, user:null,
+                connected:false, config:null,
+                unsubShip:null, unsubCfg:null, applyingRemote:false,
+                firstShipSnap:true, status:'offline' };
+let _cloudShipTimer=null, _cloudCfgTimer=null, _syncedShip={};
+
+function setCloudStatus(st, msg){
+  CLOUD.status = st;
+  const email = CLOUD.user && (CLOUD.user.email || CLOUD.user.displayName) || '';
+  const map = {
+    offline:{t:'⚪ Offline (local only)', c:'var(--muted)'},
+    connecting:{t:'🟡 Connecting…', c:'var(--amber)'},
+    login:{t:'🔵 ยังไม่ได้ลงชื่อเข้าใช้', c:'#3b82f6'},
+    online:{t:'🟢 Online'+(email?(' — '+email):' — synced'), c:'var(--green)'},
+    error:{t:'🔴 Error', c:'var(--red)'},
+  };
+  const m = map[st]||map.offline;
+  const dot = g('cloud_foot'); if(dot) dot.innerHTML = `<span style="color:${m.c};font-weight:700">${m.t}</span>`;
+  const panel = g('cloud_status'); if(panel) panel.innerHTML = `<span style="color:${m.c};font-weight:700">${m.t}</span>${msg?` <span style="color:var(--muted)">— ${escapeHtml(msg)}</span>`:''}`;
+}
+
+// Parse the firebaseConfig the user pastes (accepts a JS object literal or JSON).
+function parseFirebaseConfig(text){
+  let t = (text||'').trim();
+  const i = t.indexOf('{'), j = t.lastIndexOf('}');
+  if(i<0 || j<0) throw new Error('ไม่พบ { … } ใน config');
+  t = t.slice(i, j+1);
+  return (new Function('return ('+t+')'))(); // user's own config; object-literal eval
+}
+
+async function connectCloud(cfg){
+  try{
+    setCloudStatus('connecting');
+    const appMod  = await import('https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js');
+    const fsMod   = await import('https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js');
+    const authMod = await import('https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js');
+    CLOUD.app = appMod.initializeApp(cfg, 'cshub'); // named instance (won't clash with SFP)
+    CLOUD.db  = fsMod.getFirestore(CLOUD.app);
+    CLOUD.fs  = fsMod;
+    CLOUD.auth = authMod.getAuth(CLOUD.app);
+    CLOUD.authMod = authMod;
+    CLOUD.config = cfg;
+    localStorage.setItem(LS_FBCFG, JSON.stringify(cfg));
+    // Data sync starts only once a Google user is signed in.
+    authMod.onAuthStateChanged(CLOUD.auth, (user)=>{
+      CLOUD.user = user || null;
+      if(user){
+        CLOUD.connected = true;
+        CLOUD.firstShipSnap = true; _syncedShip = {};
+        startCloudListeners();
+        setCloudStatus('online');
+      }else{
+        CLOUD.connected = false;
+        try{ CLOUD.unsubShip && CLOUD.unsubShip(); CLOUD.unsubCfg && CLOUD.unsubCfg(); }catch(e){}
+        CLOUD.unsubShip = CLOUD.unsubCfg = null;
+        setCloudStatus('login');
+      }
+      if(g('page-cloud') && g('page-cloud').classList.contains('active')) render_cloud();
+    });
+    setCloudStatus(CLOUD.auth.currentUser ? 'online' : 'login');
+  }catch(e){
+    CLOUD.connected = false;
+    setCloudStatus('error', e.message);
+    toast('❌ เชื่อมต่อไม่สำเร็จ: '+e.message);
+  }
+}
+window.signInGoogle = async function(){
+  if(!CLOUD.auth){ toast('⚠ วาง Firebase config แล้วกด "เชื่อมต่อ" ก่อนลงชื่อเข้าใช้'); return; }
+  try{
+    const provider = new CLOUD.authMod.GoogleAuthProvider();
+    await CLOUD.authMod.signInWithPopup(CLOUD.auth, provider);
+    toast('✅ ลงชื่อเข้าใช้แล้ว');
+  }catch(e){ toast('❌ ลงชื่อเข้าใช้ไม่สำเร็จ: '+(e.code||e.message)); }
+};
+window.signOutCloud = async function(){
+  try{ await CLOUD.authMod.signOut(CLOUD.auth); toast('ออกจากระบบแล้ว (ยังใช้ offline ได้)'); }catch(e){}
+};
+function disconnectCloud(){
+  try{ CLOUD.unsubShip && CLOUD.unsubShip(); CLOUD.unsubCfg && CLOUD.unsubCfg(); }catch(e){}
+  CLOUD.unsubShip = CLOUD.unsubCfg = null;
+  CLOUD.connected = false;
+  setCloudStatus('offline');
+  if(g('page-cloud') && g('page-cloud').classList.contains('active')) render_cloud();
+}
+
+function startCloudListeners(){
+  const { collection, onSnapshot, doc } = CLOUD.fs;
+  CLOUD.unsubShip && CLOUD.unsubShip();
+  CLOUD.unsubShip = onSnapshot(collection(CLOUD.db,shipColl()), snap=>{
+    if(snap.metadata && snap.metadata.hasPendingWrites) return; // skip our own echo
+    const remote = []; snap.forEach(d=> remote.push(d.data()));
+    if(CLOUD.firstShipSnap){
+      CLOUD.firstShipSnap = false;
+      if(remote.length===0 && shipments.length>0){ pushAllLocal(); return; } // seed empty cloud
+    }
+    applyRemoteShipments(remote);
+  }, err=> setCloudStatus('error', err.message));
+
+  CLOUD.unsubCfg && CLOUD.unsubCfg();
+  CLOUD.unsubCfg = onSnapshot(doc(CLOUD.db,metaColl(),'config'), d=>{
+    if(d.metadata && d.metadata.hasPendingWrites) return;
+    if(d.exists && d.exists()) applyRemoteConfig(d.data());
+  }, ()=>{});
+}
+
+async function pushAllLocal(){
+  try{
+    const { doc, setDoc } = CLOUD.fs;
+    for(const s of shipments){ await setDoc(doc(CLOUD.db,shipColl(),s.id), JSON.parse(JSON.stringify(s))); _syncedShip[s.id]=JSON.stringify(s); }
+    await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates});
+    setCloudStatus('online');
+    toast('☁ อัปโหลดข้อมูลในเครื่องขึ้นคลาวด์แล้ว');
+  }catch(e){ setCloudStatus('error', e.message); }
+}
+
+function applyRemoteShipments(remote){
+  CLOUD.applyingRemote = true;
+  shipments = remote.map(s=>{ if(!s.payment) s.payment={ap:false,ar:false}; return s; });
+  try{ localStorage.setItem(LS_SHIPMENTS, JSON.stringify(shipments)); }catch(e){}
+  _syncedShip = {}; shipments.forEach(s=> _syncedShip[s.id]=JSON.stringify(s));
+  CLOUD.applyingRemote = false;
+  safeRerenderActive();
+}
+function applyRemoteConfig(c){
+  CLOUD.applyingRemote = true;
+  if(Array.isArray(c.ports)) ports = c.ports;
+  if(Array.isArray(c.terminals)) terminals = c.terminals;
+  if(Array.isArray(c.checklistTemplates) && c.checklistTemplates.length) checklistTemplates = c.checklistTemplates;
+  try{ localStorage.setItem(LS_PORTS, JSON.stringify(ports)); localStorage.setItem(LS_TERMINALS, JSON.stringify(terminals)); localStorage.setItem(LS_CHECKLISTS, JSON.stringify(checklistTemplates)); }catch(e){}
+  CLOUD.applyingRemote = false;
+  safeRerenderActive();
+}
+// Re-render the visible page, but never while someone is typing in a grid cell.
+function safeRerenderActive(){
+  const ae = document.activeElement;
+  if(ae && (ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA') && ae.closest && ae.closest('.grid')) return;
+  const active = document.querySelector('.page.active');
+  if(!active) return;
+  const fn = window['render_'+active.id.replace('page-','')];
+  if(typeof fn==='function') fn();
+}
+
+function cloudSyncShipments(){
+  if(!CLOUD.connected || CLOUD.applyingRemote) return;
+  clearTimeout(_cloudShipTimer);
+  _cloudShipTimer = setTimeout(async ()=>{
+    try{
+      const { doc, setDoc, deleteDoc } = CLOUD.fs;
+      const seen = {};
+      for(const s of shipments){
+        if(!s.id) continue;
+        seen[s.id] = 1;
+        const j = JSON.stringify(s);
+        if(_syncedShip[s.id] !== j){ await setDoc(doc(CLOUD.db,shipColl(),s.id), JSON.parse(j)); _syncedShip[s.id] = j; }
+      }
+      for(const id in _syncedShip){ if(!seen[id]){ await deleteDoc(doc(CLOUD.db,shipColl(),id)); delete _syncedShip[id]; } }
+      setCloudStatus('online');
+    }catch(e){ setCloudStatus('error', e.message); }
+  }, 600);
+}
+function cloudSyncConfig(){
+  if(!CLOUD.connected || CLOUD.applyingRemote) return;
+  clearTimeout(_cloudCfgTimer);
+  _cloudCfgTimer = setTimeout(async ()=>{
+    try{ const { doc, setDoc } = CLOUD.fs; await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates}); setCloudStatus('online'); }
+    catch(e){ setCloudStatus('error', e.message); }
+  }, 800);
+}
+
+window.connectCloudFromInput = function(){
+  const ta = g('fb_config_input'); if(!ta) return;
+  let cfg; try{ cfg = parseFirebaseConfig(ta.value); }catch(e){ toast('❌ Config ไม่ถูกต้อง: '+e.message); return; }
+  if(!cfg.projectId){ toast('❌ Config ต้องมี projectId'); return; }
+  connectCloud(cfg);
+};
+window.disconnectCloudUI = function(){ disconnectCloud(); toast('🔌 ตัดการเชื่อมต่อแล้ว (ใช้งานในเครื่องต่อได้)'); };
+window.forgetCloudConfig = function(){
+  if(!confirm('ลบ Firebase config ออกจากเครื่องนี้?')) return;
+  localStorage.removeItem(LS_FBCFG); disconnectCloud(); toast('ลบ config แล้ว');
+  if(g('fb_config_input')) g('fb_config_input').value='';
+};
+window.saveCollPrefix = function(){
+  const inp = g('coll_prefix_input'); if(!inp) return;
+  let v = (inp.value||'').trim().replace(/[^a-zA-Z0-9_]/g,'_');
+  if(!v){ toast('❌ prefix ห้ามว่าง'); return; }
+  _collPrefix = v;
+  try{ localStorage.setItem(LS_FBPREFIX, v); }catch(e){}
+  toast('บันทึก prefix: '+v+' (collection: '+shipColl()+')');
+  if(CLOUD.connected){ // reconnect listeners on the new collection names
+    CLOUD.firstShipSnap = true; _syncedShip = {}; startCloudListeners();
+  }
+  render_cloud();
+};
+function cloudAutoConnect(){
+  let saved=null; try{ saved = JSON.parse(localStorage.getItem(LS_FBCFG)||'null'); }catch(e){}
+  if(saved) connectCloud(saved); // sets up auth; resumes Google session if any
+  else setCloudStatus('offline');
+}
+
+function uid(prefix){ return prefix+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); if(isNaN(dt)) return '—'; return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'}); }
+
+// Cut-off / closing time fields are free-text (matching Sea Freight Pro's
+// Booking Confirmation form), so CS staff type all sorts of formats:
+// "23-Jun-2026 17:00", "23/JUN/2026 17:00 HRS", "2026-06-23T17:00", etc.
+// new Date() alone can't reliably parse these — this normalizes the string
+// before handing it to Date so tracking/alerts actually work.
+function parseFlexibleDate(str){
+  if(!str) return null;
+  let s = String(str).trim();
+  // Strip trailing "HRS"/"hrs" and normalize slashes to dashes (23/JUN/2026 -> 23-JUN-2026)
+  s = s.replace(/\s*hrs\.?\s*$/i, '').replace(/\//g, '-');
+  let dt = new Date(s);
+  if(!isNaN(dt)) return dt;
+  // Try DD-MMM-YYYY[ HH:MM] explicitly (covers locales/engines that don't
+  // accept the dash-separated month-name format directly)
+  const m = s.match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if(m){
+    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const mon = months[m[2].slice(0,3).toLowerCase()];
+    if(mon !== undefined){
+      dt = new Date(Number(m[3]), mon, Number(m[1]), Number(m[4]||0), Number(m[5]||0));
+      if(!isNaN(dt)) return dt;
+    }
+  }
+  return null;
+}
+
+function fmtDateTime(d){ const dt=parseFlexibleDate(d); if(!dt) return d ? String(d) : '—'; return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function monthKey(dateStr){ if(!dateStr) return 'Unknown'; return dateStr.slice(0,7); }
+function monthLabel(key){
+  if(key==='Unknown') return 'Unknown';
+  const [y,m] = key.split('-').map(Number);
+  const MN=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+  return MN[m]+' '+y;
+}
+
+// ═══════════════════════════════════════════════════════
+// TERMINAL / DEPOT LIBRARY
+// ═══════════════════════════════════════════════════════
+let _termEditId = null;
+
+function render_terminals(){
+  g('topbar_actions').innerHTML = `<button class="btn btn-primary" onclick="openTerminalModal()">+ Add Terminal / Depot</button>`;
+
+  const q = (g('term_search')?.value||'').toLowerCase();
+  const filtered = terminals.filter(t => !q || (t.name+' '+t.type+' '+(t.address||'')).toLowerCase().includes(q));
+
+  g('page-terminals').innerHTML = `
+    <div class="card">
+      <div class="card-pad" style="border-bottom:1px solid var(--line);display:flex;gap:8px">
+        <input id="term_search" class="inp" placeholder="🔍 Search terminal / depot name…" style="max-width:320px" oninput="render_terminals()" value="${q?escapeHtml(q):''}">
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Type</th><th>Name</th><th>Address</th><th>Contact</th><th>Notes</th><th style="width:80px"></th></tr></thead>
+          <tbody>
+            ${filtered.length ? filtered.map(t=>`
+              <tr>
+                <td><span class="badge ${t.type==='Terminal'?'badge-teal':'badge-amber'}">${t.type}</span></td>
+                <td style="font-weight:600">${escapeHtml(t.name)}</td>
+                <td style="color:var(--muted)">${escapeHtml(t.address||'—')}</td>
+                <td style="font-family:var(--mono);font-size:11.5px">${escapeHtml(t.contact||'—')}</td>
+                <td style="color:var(--muted);max-width:200px">${escapeHtml(t.notes||'—')}</td>
+                <td style="white-space:nowrap">
+                  <button class="btn-icon" onclick="openTerminalModal('${t.id}')" title="Edit">✏️</button>
+                  <button class="btn-icon" onclick="deleteTerminal('${t.id}')" title="Delete">🗑️</button>
+                </td>
+              </tr>`).join('') : `<tr><td colspan="6"><div class="empty-state"><div class="ic">📍</div>No terminals or depots saved yet</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="terminal_modal">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-head"><h2 id="terminal_modal_title">+ Add Terminal / Depot</h2><button class="btn-icon" onclick="closeModal('terminal_modal')">✕</button></div>
+        <div class="modal-body" style="display:grid;gap:12px">
+          <div class="inp-group">
+            <label class="inp-lbl">Type</label>
+            <select id="term_m_type" class="inp">
+              <option value="Terminal">Terminal</option>
+              <option value="Depot">Depot</option>
+            </select>
+          </div>
+          <div class="inp-group"><label class="inp-lbl">Name</label><input id="term_m_name" class="inp" placeholder="e.g. LCB1 Terminal, Sahathai Depot"></div>
+          <div class="inp-group"><label class="inp-lbl">Address</label><textarea id="term_m_address" class="inp" rows="2" placeholder="Full address"></textarea></div>
+          <div class="inp-group"><label class="inp-lbl">Contact (phone/email)</label><input id="term_m_contact" class="inp" placeholder="e.g. 038-xxx-xxx"></div>
+          <div class="inp-group"><label class="inp-lbl">Notes</label><textarea id="term_m_notes" class="inp" rows="2" placeholder="Gate hours, special instructions…"></textarea></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="closeModal('terminal_modal')">Cancel</button>
+          <button class="btn btn-primary" onclick="saveTerminal()">💾 Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.openTerminalModal = function(id){
+  _termEditId = id||null;
+  g('terminal_modal_title').textContent = id ? '✏️ Edit Terminal / Depot' : '+ Add Terminal / Depot';
+  const t = id ? terminals.find(x=>x.id===id) : null;
+  g('term_m_type').value = t?.type || 'Terminal';
+  g('term_m_name').value = t?.name || '';
+  g('term_m_address').value = t?.address || '';
+  g('term_m_contact').value = t?.contact || '';
+  g('term_m_notes').value = t?.notes || '';
+  openModal('terminal_modal');
+};
+
+window.saveTerminal = function(){
+  const name = g('term_m_name').value.trim();
+  if(!name){ toast('กรุณากรอกชื่อ Terminal/Depot'); return; }
+  const data = {
+    type: g('term_m_type').value,
+    name,
+    address: g('term_m_address').value.trim(),
+    contact: g('term_m_contact').value.trim(),
+    notes: g('term_m_notes').value.trim(),
+  };
+  if(_termEditId){
+    const t = terminals.find(x=>x.id===_termEditId);
+    Object.assign(t, data);
+  } else {
+    terminals.unshift({id: uid('term'), ...data});
+  }
+  saveTerminals();
+  closeModal('terminal_modal');
+  render_terminals();
+  toast('💾 Saved');
+};
+
+window.deleteTerminal = function(id){
+  if(!confirm('Delete this terminal/depot?')) return;
+  terminals = terminals.filter(t=>t.id!==id);
+  saveTerminals();
+  render_terminals();
+  toast('🗑️ Deleted');
+};
+
+function openModal(id){ g(id).classList.add('open'); }
+function closeModal(id){ g(id).classList.remove('open'); }
+function escapeHtml(s){ return (s===undefined||s===null) ? '' : String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ═══════════════════════════════════════════════════════
+// SHIPMENTS — list, grouped by month, with filters
+// ═══════════════════════════════════════════════════════
+const SHIP_STATUSES = ['In Process','Confirmed','LOAD','Completed','Cancelled'];
+const STATUS_COLOR = {'In Process':'badge-amber','Confirmed':'badge-teal','LOAD':'badge-green','Completed':'badge-gray','Cancelled':'badge-red'};
+// Map older status names onto the new workflow.
+const STATUS_MIGRATE = {'Booking Confirmed':'Confirmed','In Progress':'In Process','Loaded':'LOAD','Original Released':'Completed'};
+
+let _shipCollapsedMonths = JSON.parse(localStorage.getItem('cshub_collapsed_months')||'[]');
+let _shipFilterStatus = '';
+let _shipFilterQuery = '';
+let _shipScrollLeft = 0;
+let _focusAfterRender = null;
+let _gridSaveTimer = null;
+let _colFilters = {}; // per-column filters, keyed by column key (+ 'status','payment')
+let _shipMonth = 'all'; // selected month folder (ETD month key 'YYYY-MM', 'Unknown', or 'all')
+let _shipCS = 'all';    // selected CS folder (CS name, '—' for unassigned, or 'all')
+
+// Columns mirror the user's Excel (Book2.xlsx) layout, left→right. `cutoff`
+// columns get urgency colouring + feed the Cut-off Tracking page; `country`
+// columns (POD/FPOD) re-evaluate the ACI/AMS alert when edited.
+const GRID_COLS = [
+  {k:'bookingNo', label:'Booking No.', type:'text', w:120, mono:true},
+  {k:'jobno',     label:'Job No.',     type:'text', w:140, mono:true},
+  {k:'customer',  label:'Customer',    type:'text', w:160},
+  {k:'sale',      label:'Sale',        type:'text', w:120},
+  {k:'cs',        label:'CS',          type:'text', w:110},
+  {k:'cy',        label:'CY',          type:'date', cutoff:true, noTint:true},
+  {k:'rtn',       label:'RTN',         type:'date', cutoff:true, noTint:true},
+  {k:'si',        label:'SI',          type:'date', cutoff:true},
+  {k:'vgm',       label:'VGM',         type:'date', cutoff:true},
+  {k:'bl',        label:'BL',          type:'date', cutoff:true},
+  {k:'amsaci',    label:'AMS/ISF/ACI', type:'select', options:['','YES','NO','ISF SENT'], w:120},
+  {k:'etd',       label:'ETD',         type:'date'},
+  {k:'__payment', label:'AP/AR',       type:'payment'},
+  {k:'req',       label:'REQ',         type:'text', w:170},
+  {k:'vol',       label:'VOL',         type:'text', w:90},
+  {k:'carrier',   label:'Carrier',     type:'text', w:100},
+  {k:'por',       label:'POR',         type:'text', w:160},
+  {k:'pol',       label:'POL',         type:'text', w:160},
+  {k:'pod',       label:'POD',         type:'text', w:150, country:true},
+  {k:'fpod',      label:'FPOD',        type:'text', w:150, country:true},
+  {k:'feeder',    label:'Feeder',      type:'text', w:160},
+  {k:'motherVsl',  label:'Mother Vessel', type:'text', w:160},
+];
+
+function rememberScroll(){ const w=g('ship_grid_wrap'); if(w) _shipScrollLeft=w.scrollLeft; }
+function scheduleSave(){ clearTimeout(_gridSaveTimer); _gridSaveTimer=setTimeout(saveShipments, 400); }
+
+// Which checklist task each cut-off column is "done" by. Used to (a) flag a
+// passed cut-off whose task isn't ticked yet with a ❗, and (b) decide when to
+// nudge the AMS/ISF cell. Matching is by keyword so it survives template edits.
+const CUTOFF_TASK = {
+  si:  {kw:'si submitted', label:'SI submitted'},
+  vgm: {kw:'vgm',          label:'VGM submitted'},
+  bl:  {kw:'draft b/l',    label:'Draft B/L checked (DOC)'},
+};
+function isChecklistDone(s, keyword){
+  if(!s || !s.checklist) return false;
+  const items = getEffectiveChecklistItems(s);
+  const item = items.find(i => i.toLowerCase().includes(keyword));
+  return item ? !!s.checklist[item] : false;
+}
+
+// ETD status by calendar day, for the AP/AR payment reminder:
+//   'reached' = ETD is today, 'passed' = ETD already gone, null = future/none.
+function etdState(s){
+  if(!s || !s.etd) return null;
+  const dt = parseFlexibleDate(s.etd); if(!dt) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const etd = new Date(dt); etd.setHours(0,0,0,0);
+  if(etd.getTime() === today.getTime()) return 'reached';
+  if(etd.getTime() <  today.getTime()) return 'passed';
+  return null;
+}
+// Whole days the ETD is in the past (0 = today or future).
+function daysPastEtd(s){
+  if(!s || !s.etd) return 0;
+  const dt = parseFlexibleDate(s.etd); if(!dt) return 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const etd = new Date(dt); etd.setHours(0,0,0,0);
+  return Math.max(0, Math.round((today - etd) / 86400000));
+}
+
+// AMS/ISF/ACI auto-default: filing only applies to the USA (AMS/ISF) and Canada
+// (ACI). For any other destination there's nothing to file, so default the cell
+// to "NO". US/CA are left for the user to choose (YES / ISF SENT); a stale "NO"
+// on a US/CA shipment is cleared so it isn't mistaken for "no filing needed".
+function applyAmsDefault(s){
+  if(!s) return;
+  const hasDest = !!(s.pod || s.fpod);
+  if(!hasDest) return;               // no destination yet — leave blank
+  const c = destCountry(s);
+  if(c === null){ if(!s.amsaci) s.amsaci = 'NO'; }
+  else if(s.amsaci === 'NO'){ s.amsaci = ''; }
+}
+
+// True only when every checklist item for this shipment is ticked.
+function allChecklistDone(s){
+  const items = getEffectiveChecklistItems(s);
+  if(!items.length || !s.checklist) return false;
+  return items.every(i => !!s.checklist[i]);
+}
+
+// Auto-advance status when ETD is reached: In Process / Confirmed -> LOAD.
+// Never downgrades a Completed or Cancelled shipment.
+function syncAutoStatus(s){
+  if(!s) return;
+  if(s.status==='Completed' || s.status==='Cancelled') return;
+  if(etdState(s) && (s.status==='In Process' || s.status==='Confirmed')){
+    s.status = 'LOAD';
+    if(!s.statusHistory) s.statusHistory = [];
+    s.statusHistory.push({status:'LOAD', date:new Date().toISOString(), note:'Auto: ETD reached'});
+  }
+}
+
+// Cut-off cell colour:
+//   • not passed yet & within 72h  -> YELLOW (approaching)
+//   • passed, but its checklist task isn't ticked yet -> RED (still needs action)
+//   • passed and handled (task done, or no task to track) -> no highlight
+//   • otherwise -> no highlight
+const CUTOFF_NEAR_HOURS = 72;
+function dateCellClass(s, col){
+  const v = s[col.k]||'';
+  if(!v || !col.cutoff || col.noTint) return '';
+  const dt = parseFlexibleDate(v);
+  if(!dt) return '';
+  const hrs = (dt - new Date()) / 3600000;
+  if(hrs > 0) return hrs <= CUTOFF_NEAR_HOURS ? 'cutoff-yellow' : '';
+  const task = CUTOFF_TASK[col.k];
+  return (task && !isChecklistDone(s, task.kw)) ? 'cutoff-red' : '';
+}
+
+// Text used to match a column filter — for date cells we match both the raw
+// ISO value and the displayed dd/mm/yyyy, so typing either form works.
+// ── Excel-style per-column "AutoFilter" ──────────────────────────────────
+// Each column header carries a dropdown button. Clicking it lists the distinct
+// values that actually appear in that column (with a search box + "select all"),
+// and the user ticks which values to keep — exactly like Excel's filter. A
+// column filter is stored in _colFilters[key] as an array of allowed display
+// values; absence/empty means "show all".
+const STATUS_COL = {k:'status', type:'status', label:'Status'};
+
+// The canonical display value of a cell, used both for showing in the dropdown
+// and for matching rows against the chosen values.
+function getColDisplay(s, col){
+  if(col.type==='payment'){ const p=s.payment||{}; return `AP ${p.ap?'✓':'✗'} · AR ${p.ar?'✓':'✗'}`; }
+  if(col.type==='status'){ return s.status||''; }
+  const v = s[col.k]||'';
+  if(col.type==='date' && v){
+    const dt = parseFlexibleDate(v);
+    if(dt) return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+  }
+  return String(v);
+}
+
+// Distinct values for a column, sorted (dates chronologically by their raw ISO).
+function distinctColValues(col){
+  const map = new Map(); // display -> sortKey
+  shipments.forEach(s=>{
+    const disp = getColDisplay(s,col);
+    if(map.has(disp)) return;
+    let sortKey = disp;
+    if(col.type==='date'){ sortKey = (s[col.k]||'~'); } // blanks sort last
+    map.set(disp, sortKey);
+  });
+  return Array.from(map.entries())
+    .sort((a,b)=> String(a[1]).localeCompare(String(b[1])))
+    .map(([value])=>({ value, label: value===''?'(ว่าง)':value }));
+}
+
+function colFilterControl(col){
+  const cur = _colFilters[col.k];
+  const active = Array.isArray(cur) && cur.length>0;
+  const label = active ? `กรองอยู่ (${cur.length}) ▾` : 'filter ▾';
+  return `<button class="flt-btn ${active?'active':''}" onclick="openColFilter(event,'${col.k}')" title="กรองแบบ Excel">${label}</button>`;
+}
+
+function colByKey(key){ return key==='status' ? STATUS_COL : GRID_COLS.find(c=>c.k===key); }
+
+window.openColFilter = function(ev, key){
+  closeColFilter();
+  const col = colByKey(key); if(!col) return;
+  const cur = _colFilters[key]; // array or undefined
+  const values = distinctColValues(col);
+  const allChecked = !Array.isArray(cur);
+  const list = values.map(o=>`
+    <label data-lbl="${escapeHtml(o.label.toLowerCase())}">
+      <input type="checkbox" class="fp-chk" value="${escapeHtml(o.value)}" ${(allChecked || (cur && cur.includes(o.value)))?'checked':''}>
+      <span>${escapeHtml(o.label)}</span>
+    </label>`).join('');
+  const html = `
+    <div class="flt-pop" id="flt_pop">
+      <div class="fp-head">
+        <div style="font-size:11px;font-weight:700;color:var(--slate);margin-bottom:6px;text-transform:none">${escapeHtml(col.label)}</div>
+        <input class="inp" id="fp_search" placeholder="🔍 ค้นหาค่า…" style="font-size:12px;padding:5px 8px" oninput="filterPopList()">
+        <label style="display:flex;align-items:center;gap:8px;padding:7px 2px 2px;font-size:12px;font-weight:600;cursor:pointer">
+          <input type="checkbox" id="fp_all" ${allChecked?'checked':''} onchange="togglePopAll(this.checked)"> (เลือกทั้งหมด)
+        </label>
+      </div>
+      <div class="fp-list" id="fp_list">${list || '<div style="padding:12px;color:var(--muted);font-size:12px">ไม่มีค่า</div>'}</div>
+      <div class="fp-foot">
+        <button class="btn btn-ghost btn-sm" onclick="clearColFilter('${key}')">ล้างตัวกรอง</button>
+        <button class="btn btn-primary btn-sm" onclick="applyColFilter('${key}')">ตกลง</button>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  // Position under the button, clamped to the viewport
+  const pop = g('flt_pop');
+  const btn = ev.currentTarget || ev.target;
+  const r = btn.getBoundingClientRect();
+  const W = pop.offsetWidth || 240;
+  let left = Math.min(r.left, window.innerWidth - W - 8);
+  if(left < 8) left = 8;
+  let top = r.bottom + 4;
+  const popH = pop.offsetHeight || 320;
+  if(top + popH > window.innerHeight - 8) top = Math.max(8, r.top - popH - 4);
+  pop.style.left = left+'px';
+  pop.style.top  = top+'px';
+  const sb = g('fp_search'); if(sb) sb.focus();
+};
+
+window.filterPopList = function(){
+  const q = (g('fp_search')?.value||'').toLowerCase();
+  g('fp_list')?.querySelectorAll('label').forEach(l=>{
+    l.style.display = l.getAttribute('data-lbl').includes(q) ? 'flex' : 'none';
+  });
+};
+window.togglePopAll = function(checked){
+  g('fp_list')?.querySelectorAll('label').forEach(l=>{
+    if(l.style.display !== 'none'){ const c=l.querySelector('.fp-chk'); if(c) c.checked=checked; }
+  });
+};
+window.applyColFilter = function(key){
+  const pop = g('flt_pop'); if(!pop) return;
+  const boxes = Array.from(pop.querySelectorAll('.fp-chk'));
+  const checked = boxes.filter(b=>b.checked).map(b=>b.value);
+  if(checked.length === boxes.length){ delete _colFilters[key]; } // everything ticked = no filter
+  else { _colFilters[key] = checked; }
+  closeColFilter();
+  rememberScroll();
+  render_shipments();
+};
+window.clearColFilter = function(key){
+  delete _colFilters[key];
+  closeColFilter();
+  rememberScroll();
+  render_shipments();
+};
+function closeColFilter(){ g('flt_pop')?.remove(); }
+window.clearColFilters = function(){ _colFilters={}; _shipFilterQuery=''; closeColFilter(); rememberScroll(); render_shipments(); };
+
+// Close the filter popover when clicking outside of it (but not when clicking
+// another filter button — that opens its own popover).
+document.addEventListener('mousedown', function(e){
+  if(!g('flt_pop')) return;
+  if(g('flt_pop').contains(e.target)) return;
+  if(e.target.closest && e.target.closest('.flt-btn')) return;
+  closeColFilter();
+});
+
+function rowLeadHtml(idx, s){
+  const c = destCountry(s);
+  const aci = c==='CA' ? `<span class="badge badge-red" style="font-size:9px" title="Canada-bound — file Advance Commercial Information (ACI) before the border">🇨🇦 ACI</span>` : '';
+  const ams = c==='US' ? `<span class="badge badge-teal" style="font-size:9px" title="USA-bound — AMS/ISF filing required">🇺🇸 AMS/ISF</span>` : '';
+  // Pre-Alert overdue: 1 day past ETD = notification, 2+ days = ❗
+  let pa = '';
+  if(!isChecklistDone(s,'pre-alert')){
+    const d = daysPastEtd(s);
+    if(d >= 2) pa = `<span class="badge badge-red" style="font-size:9px" title="เลย ETD ${d} วันแล้ว — ยังไม่ได้ส่ง Pre-Alert">❗ Pre-Alert</span>`;
+    else if(d >= 1) pa = `<span class="badge badge-amber" style="font-size:9px" title="เลย ETD ${d} วันแล้ว — ยังไม่ได้ส่ง Pre-Alert">🔔 Pre-Alert</span>`;
+  }
+  const badges = `${aci}${ams}${pa}`;
+  const doneLabel = s.status==='Completed'
+    ? `<div style="margin-top:3px;color:var(--green);font-weight:800;font-size:11px;letter-spacing:.3px">✓ COMPLETED</div>`
+    : '';
+  return `<td class="no-print" style="white-space:nowrap">
+    <div style="display:flex;gap:2px;align-items:center">
+      <button class="btn-icon" style="width:26px;height:26px" onclick="openBookingPdfModal(${idx})" title="Booking Confirmation PDF">📄</button>
+      <button class="btn-icon" style="width:26px;height:26px" onclick="openShipmentChecklist(${idx})" title="Checklist">✅</button>
+      <button class="btn-icon" style="width:26px;height:26px" onclick="duplicateShipment(${idx})" title="Duplicate">📑</button>
+      ${isUsaBoundShipment(s) ? `<button class="btn-icon" style="width:26px;height:26px" onclick="openIsfModal(${idx})" title="ISF Detail (USA)">🛃</button>` : ''}
+      <button class="btn-icon" style="width:26px;height:26px" onclick="deleteShipment(${idx})" title="Delete">🗑️</button>
+    </div>
+    ${badges?`<div style="margin-top:3px;display:flex;gap:3px;flex-wrap:wrap">${badges}</div>`:''}
+    ${doneLabel}
+  </td>`;
+}
+
+function gridCellHtml(idx, s, col){
+  if(col.type==='payment'){
+    const p = s.payment||{ap:false,ar:false};
+    const paid = p.ap && p.ar;
+    let tdcls='', warn='';
+    if(!paid){
+      const st = etdState(s);
+      if(st==='passed'){ tdcls='apar-passed'; warn=`<span class="cutoff-warn" title="เลย ETD แล้ว — ยังทำ AP/AR ไม่ครบ">❗</span>`; }
+      else if(st==='reached'){ tdcls='apar-reached'; }
+    }
+    return `<td class="no-print ${tdcls}" style="text-align:center"><div style="display:flex;align-items:center;justify-content:center;gap:3px">${warn}<button class="apar-cell" style="margin:0" onclick="openPaymentModal(${idx})" title="AP จ่ายค่าเรือ / AR เก็บเงินลูกค้า"><span class="apar-badge ${p.ap?'on':''}">AP</span><span class="apar-badge ${p.ar?'on':''}">AR</span></button></div></td>`;
+  }
+  if(col.type==='select'){
+    const v = s[col.k]||'';
+    let tdcls='', warnIcon='';
+    if(col.k==='amsaci'){
+      const vgmPast = s.vgm && cutoffUrgency(s.vgm).hoursLeft <= 0;
+      if((vgmPast || isChecklistDone(s,'vgm')) && !v){
+        tdcls='ams-alert';
+        warnIcon=`<span title="เลย/ติ๊ก VGM แล้ว — กรุณาเลือกสถานะ AMS/ISF" style="color:var(--amber);font-weight:700;margin-right:3px;flex-shrink:0">⚠</span>`;
+      }
+    }
+    const opts = col.options.map(o=>`<option value="${escapeHtml(o)}" ${v===o?'selected':''}>${o===''?'—':escapeHtml(o)}</option>`).join('');
+    return `<td class="${tdcls}"><div style="display:flex;align-items:center">${warnIcon}<select class="gcell" style="flex:1;${col.w?`min-width:${col.w}px;`:''}" data-id="${s.id}" data-field="${col.k}" onchange="updateCellRerender(${idx},'${col.k}',this.value)">${opts}</select></div></td>`;
+  }
+  if(col.type==='date'){
+    const v = s[col.k]||'';
+    const cls = dateCellClass(s, col);
+    const u = (v && col.cutoff) ? cutoffUrgency(v) : null;
+    const task = CUTOFF_TASK[col.k];
+    const passedUndone = task && v && cutoffUrgency(v).hoursLeft <= 0 && !isChecklistDone(s, task.kw);
+    const input = `<input type="date" class="gcell ${v?'':'is-empty'}" data-id="${s.id}" data-field="${col.k}" value="${escapeHtml(v)}" onchange="updateDate(${idx},'${col.k}',this.value)">`;
+    const inner = passedUndone
+      ? `<div style="display:flex;align-items:center;gap:3px"><span class="cutoff-warn" title="เลย cut-off แล้วแต่ยังไม่ได้ติ๊ก &quot;${escapeHtml(task.label)}&quot; ใน checklist">❗</span>${input}</div>`
+      : input;
+    return `<td class="grid-date ${cls}" ${u?`title="${u.label}"`:''}>${inner}</td>`;
+  }
+  const v = s[col.k]||'';
+  const style = (col.mono?'font-family:var(--mono);':'')+(col.w?`min-width:${col.w}px;`:'');
+  const commit = col.country ? ` onchange="onCountryEdited(${idx})"` : '';
+  return `<td><input class="gcell" style="${style}" data-id="${s.id}" data-field="${col.k}" value="${escapeHtml(v)}" oninput="updateCell(${idx},'${col.k}',this.value)"${commit}></td>`;
+}
+
+function gridNewCellHtml(col){
+  if(col.type==='payment') return `<td></td>`;
+  if(col.type==='select'){
+    const opts = col.options.map(o=>`<option value="${escapeHtml(o)}">${o===''?'—':escapeHtml(o)}</option>`).join('');
+    return `<td><select class="gcell" style="${col.w?`min-width:${col.w}px;`:''}" data-new="1" data-field="${col.k}" onchange="newRowInput('${col.k}',this.value,this)">${opts}</select></td>`;
+  }
+  if(col.type==='date') return `<td class="grid-date"><input type="date" class="gcell is-empty" data-new="1" data-field="${col.k}" onchange="newRowInput('${col.k}',this.value,this)"></td>`;
+  const style=(col.mono?'font-family:var(--mono);':'')+(col.w?`min-width:${col.w}px;`:'');
+  return `<td><input class="gcell" style="${style}" data-new="1" data-field="${col.k}" oninput="newRowInput('${col.k}',this.value,this)"></td>`;
+}
+
+// Documents page state (independent doc-name/month folders + search + scroll).
+let _docName='all', _docMonth='all', _docFilterQuery='', _docScrollLeft=0;
+function rememberDocScroll(){ const w=g('doc_grid_wrap'); if(w) _docScrollLeft=w.scrollLeft; }
+// Re-render whichever grid page is currently visible so edits made from either
+// the Shipments or Documents view refresh in place (both read the same data).
+function rerenderGrid(){
+  const dp = g('page-documents');
+  if(dp && dp.classList.contains('active')){ rememberDocScroll(); render_documents(); return; }
+  rememberScroll(); render_shipments();
+}
+
+function render_shipments(){
+  g('topbar_actions').innerHTML = `<button class="btn btn-ghost" onclick="openExportToSfpModal()">⬇ Export to Sea Freight Pro</button>`;
+  const ae = document.activeElement;
+  const activeId = (ae && ae.id === 'ship_search') ? ae.id : null;
+  const activeCursor = activeId ? ae.selectionStart : null;
+
+  const q = _shipFilterQuery.toLowerCase();
+  const anyFilter = !!_shipFilterQuery || Object.keys(_colFilters).some(k=>Array.isArray(_colFilters[k]) && _colFilters[k].length);
+
+  // CS folders (TOP level) — counts across all shipments.
+  const csGroups = {};
+  shipments.forEach(s=>{ const k=(s.cs||'').trim()||'—'; csGroups[k]=(csGroups[k]||0)+1; });
+  const csKeys = Object.keys(csGroups).sort((a,b)=> a==='—'?1 : b==='—'?-1 : a.localeCompare(b));
+  if(_shipCS!=='all' && !(_shipCS in csGroups)) _shipCS = 'all';
+  const csLabel = k => k==='—' ? 'ไม่ระบุ CS' : k;
+  const attrJs = v => JSON.stringify(v).replace(/&/g,'&amp;').replace(/'/g,'&#39;');
+
+  // Month folders (SECOND level) — counted within the selected CS, so each CS's
+  // months sit underneath their own folder, newest first, "ไม่ระบุเดือน" last.
+  const monthSource = shipments.filter(s => _shipCS==='all' || ((s.cs||'').trim()||'—')===_shipCS);
+  const monthGroups = {};
+  monthSource.forEach(s=>{ const k = monthKey(s.etd); monthGroups[k] = (monthGroups[k]||0)+1; });
+  const monthKeys = Object.keys(monthGroups).sort((a,b)=> a==='Unknown'?1 : b==='Unknown'?-1 : b.localeCompare(a));
+  if(_shipMonth!=='all' && !(_shipMonth in monthGroups)) _shipMonth = 'all';
+  const folderLabel = k => k==='Unknown' ? 'ไม่ระบุเดือน' : monthLabel(k);
+
+  const folderBar = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <span style="font-size:11px;color:var(--muted);font-weight:700">👤 CS</span>
+      <button class="folder-chip ${_shipCS==='all'?'active':''}" onclick="setShipCS('all')">ทั้งหมด (${shipments.length})</button>
+      ${csKeys.map(k=>`<button class="folder-chip ${_shipCS===k?'active':''}" onclick='setShipCS(${attrJs(k)})'>👤 ${escapeHtml(csLabel(k))} (${csGroups[k]})</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;padding-left:14px;border-left:3px solid var(--line2)">
+      <span style="font-size:11px;color:var(--muted);font-weight:700">📅 เดือน</span>
+      <button class="folder-chip ${_shipMonth==='all'?'active':''}" onclick="setShipMonth('all')">ทั้งหมด (${monthSource.length})</button>
+      ${monthKeys.map(k=>`<button class="folder-chip ${_shipMonth===k?'active':''}" onclick="setShipMonth('${k}')">📁 ${escapeHtml(folderLabel(k))} (${monthGroups[k]})</button>`).join('')}
+    </div>`;
+
+  const view = shipments.map((s,idx)=>({s,idx})).filter(({s})=>{
+    // month folder
+    if(_shipMonth!=='all' && monthKey(s.etd)!==_shipMonth) return false;
+    // CS folder
+    if(_shipCS!=='all' && ((s.cs||'').trim()||'—')!==_shipCS) return false;
+    // global quick-search across key fields
+    if(q){
+      const txt = [s.bookingNo,s.jobno,s.customer,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod,s.req,s.vol].join(' ').toLowerCase();
+      if(!txt.includes(q)) return false;
+    }
+    // per-column Excel-style filters (chosen value sets)
+    for(const c of GRID_COLS){
+      const f = _colFilters[c.k];
+      if(Array.isArray(f) && f.length && !f.includes(getColDisplay(s,c))) return false;
+    }
+    const sf = _colFilters.status;
+    if(Array.isArray(sf) && sf.length && !sf.includes(s.status)) return false;
+    return true;
+  });
+
+  // Alert strip — active shipments only
+  const activeShips = shipments.filter(s=>s.status!=='Completed' && s.status!=='Cancelled');
+  const aciCount = activeShips.filter(s=>destCountry(s)==='CA').length;
+  let cutoffDue = 0;
+  activeShips.forEach(s=>CUTOFF_DEFS.forEach(d=>{ const v=s[d.key]; if(v && cutoffUrgency(v).hoursLeft<=72) cutoffDue++; }));
+
+  const headCells = GRID_COLS.map(c=>`<th>${escapeHtml(c.label)}${colFilterControl(c)}</th>`).join('');
+
+  g('page-shipments').innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-pad" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input id="ship_search" class="inp" placeholder="🔍 ค้นหารวมทุกช่อง (Booking / Job / Customer / POL / POD / REQ…)" style="max-width:360px" value="${escapeHtml(_shipFilterQuery)}" oninput="_shipFilterQuery=this.value;rememberScroll();render_shipments()">
+        ${anyFilter?`<button class="btn btn-ghost btn-sm" onclick="clearColFilters()">✕ ล้างตัวกรองทั้งหมด</button>`:''}
+        <span style="margin-left:auto;font-size:12px;color:var(--muted)">${view.length} shipment(s)</span>
+      </div>
+    </div>
+
+    ${folderBar}
+
+    ${(aciCount||cutoffDue)?`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      ${aciCount?`<div class="badge badge-red" style="padding:7px 12px;font-size:12px">🇨🇦 ACI is required — ${aciCount} shipment(s) bound for Canada</div>`:''}
+      ${cutoffDue?`<div class="badge badge-amber" style="padding:7px 12px;font-size:12px">⏱ ${cutoffDue} cut-off(s) due within 72h</div>`:''}
+    </div>`:''}
+
+    <div class="card">
+      <div class="tbl-wrap" id="ship_grid_wrap" style="max-height:calc(100vh - 230px)">
+        <table class="grid">
+          <thead><tr>
+            <th class="no-print" style="vertical-align:top">Actions</th>
+            ${headCells}
+            <th class="no-print" style="vertical-align:top">Status${colFilterControl(STATUS_COL)}</th>
+          </tr></thead>
+          <tbody>
+            ${view.map(({s,idx})=>`<tr class="${s.status==='Completed'?'row-done':''}">
+              ${rowLeadHtml(idx,s)}
+              ${GRID_COLS.map(c=>gridCellHtml(idx,s,c)).join('')}
+              <td class="no-print"><select class="gcell" style="min-width:152px" onchange="changeShipmentStatus(${idx},this.value)">${SHIP_STATUSES.map(st=>`<option ${s.status===st?'selected':''}>${st}</option>`).join('')}</select></td>
+            </tr>`).join('')}
+            <tr class="grid-newrow">
+              <td class="no-print" style="color:var(--teal-dk);font-size:10px;text-align:center;font-weight:700">+ ใหม่</td>
+              ${GRID_COLS.map(c=>gridNewCellHtml(c)).join('')}
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      ${(view.length===0 && shipments.length>0) ? `<div class="empty-state" style="padding:24px"><div class="ic">🔍</div>ไม่พบ Shipment ที่ตรงกับตัวกรอง</div>` : ''}
+      ${shipments.length===0 ? `<div class="empty-state" style="padding:24px"><div class="ic">📦</div>ยังไม่มี Shipment — เริ่มกรอกข้อมูลในแถว "+ ใหม่" ด้านบนได้เลย</div>` : ''}
+    </div>
+  `;
+
+  // Restore search/filter focus
+  if(activeId){
+    const el = g(activeId);
+    if(el){ el.focus(); try{ el.setSelectionRange(activeCursor, activeCursor); }catch(e){} }
+  }
+  const wrap = g('ship_grid_wrap'); if(wrap) wrap.scrollLeft = _shipScrollLeft;
+  // Restore focus after new-row creation / date edits
+  if(_focusAfterRender){
+    const el = document.querySelector(`[data-id="${_focusAfterRender.id}"][data-field="${_focusAfterRender.field}"]`);
+    if(el){
+      el.focus();
+      if(el.tagName==='INPUT' && el.type!=='date'){ try{ el.setSelectionRange(_focusAfterRender.pos, _focusAfterRender.pos); }catch(e){} }
+    }
+    _focusAfterRender = null;
+  }
+}
+
+// ── DOCUMENTS PAGE ──────────────────────────────────────────────────────────
+// Same data + same systems as Shipments (cells, checklist, status, ISF, PDF —
+// all linked because they share the `shipments` array), but only shows bookings
+// CS has Confirmed onward, and adds an editable "Document Name" column up front.
+const DOC_STATUSES = ['Confirmed','LOAD','Completed'];
+const DOCNAME_COL = {k:'docName', label:'Document Name', type:'text', w:180};
+const DOC_COLS = [DOCNAME_COL, ...GRID_COLS];
+
+window.setDocName = function(n){ _docName = n; rememberDocScroll(); render_documents(); };
+window.setDocMonth = function(m){ _docMonth = m; rememberDocScroll(); render_documents(); };
+
+function render_documents(){
+  g('topbar_actions').innerHTML = '';
+
+  const ae = document.activeElement;
+  const activeId = (ae && ae.id === 'doc_search') ? ae.id : null;
+  const activeCursor = activeId ? ae.selectionStart : null;
+  const q = _docFilterQuery.toLowerCase();
+
+  // Only Confirmed-onward bookings reach the Documents queue.
+  const docBase = shipments.filter(s => DOC_STATUSES.includes(s.status));
+
+  // Document-Name folders (top) over the document queue.
+  const docGroups = {};
+  docBase.forEach(s=>{ const k=(s.docName||'').trim()||'—'; docGroups[k]=(docGroups[k]||0)+1; });
+  const docKeys = Object.keys(docGroups).sort((a,b)=> a==='—'?1 : b==='—'?-1 : a.localeCompare(b));
+  if(_docName!=='all' && !(_docName in docGroups)) _docName = 'all';
+  const docLabel = k => k==='—' ? 'ไม่ระบุชื่อเอกสาร' : k;
+  const attrJs = v => JSON.stringify(v).replace(/&/g,'&amp;').replace(/'/g,'&#39;');
+
+  // Month folders (second) within the selected document name.
+  const monthSource = docBase.filter(s => _docName==='all' || ((s.docName||'').trim()||'—')===_docName);
+  const monthGroups = {};
+  monthSource.forEach(s=>{ const k = monthKey(s.etd); monthGroups[k] = (monthGroups[k]||0)+1; });
+  const monthKeys = Object.keys(monthGroups).sort((a,b)=> a==='Unknown'?1 : b==='Unknown'?-1 : b.localeCompare(a));
+  if(_docMonth!=='all' && !(_docMonth in monthGroups)) _docMonth = 'all';
+  const folderLabel = k => k==='Unknown' ? 'ไม่ระบุเดือน' : monthLabel(k);
+
+  const folderBar = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <span style="font-size:11px;color:var(--muted);font-weight:700">📄 ชื่อเอกสาร</span>
+      <button class="folder-chip ${_docName==='all'?'active':''}" onclick="setDocName('all')">ทั้งหมด (${docBase.length})</button>
+      ${docKeys.map(k=>`<button class="folder-chip ${_docName===k?'active':''}" onclick='setDocName(${attrJs(k)})'>📄 ${escapeHtml(docLabel(k))} (${docGroups[k]})</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;padding-left:14px;border-left:3px solid var(--line2)">
+      <span style="font-size:11px;color:var(--muted);font-weight:700">📅 เดือน</span>
+      <button class="folder-chip ${_docMonth==='all'?'active':''}" onclick="setDocMonth('all')">ทั้งหมด (${monthSource.length})</button>
+      ${monthKeys.map(k=>`<button class="folder-chip ${_docMonth===k?'active':''}" onclick="setDocMonth('${k}')">📁 ${escapeHtml(folderLabel(k))} (${monthGroups[k]})</button>`).join('')}
+    </div>`;
+
+  const view = shipments.map((s,idx)=>({s,idx})).filter(({s})=>{
+    if(!DOC_STATUSES.includes(s.status)) return false;
+    if(_docMonth!=='all' && monthKey(s.etd)!==_docMonth) return false;
+    if(_docName!=='all' && ((s.docName||'').trim()||'—')!==_docName) return false;
+    if(q){
+      const txt = [s.docName,s.bookingNo,s.jobno,s.customer,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod].join(' ').toLowerCase();
+      if(!txt.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const headCells = DOC_COLS.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('');
+
+  g('page-documents').innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-pad" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input id="doc_search" class="inp" placeholder="🔍 ค้นหา (Document / Booking / Job / Customer / POL / POD…)" style="max-width:360px" value="${escapeHtml(_docFilterQuery)}" oninput="_docFilterQuery=this.value;rememberDocScroll();render_documents()">
+        <span style="margin-left:auto;font-size:12px;color:var(--muted)">${view.length} document(s)</span>
+      </div>
+    </div>
+
+    ${folderBar}
+
+    <div class="card">
+      <div class="tbl-wrap" id="doc_grid_wrap" style="max-height:calc(100vh - 230px)">
+        <table class="grid">
+          <thead><tr>
+            <th class="no-print" style="vertical-align:top">Actions</th>
+            ${headCells}
+            <th class="no-print" style="vertical-align:top">Status</th>
+          </tr></thead>
+          <tbody>
+            ${view.map(({s,idx})=>`<tr class="${s.status==='Completed'?'row-done':''}">
+              ${rowLeadHtml(idx,s)}
+              ${DOC_COLS.map(c=>gridCellHtml(idx,s,c)).join('')}
+              <td class="no-print"><select class="gcell" style="min-width:152px" onchange="changeShipmentStatus(${idx},this.value)">${SHIP_STATUSES.map(st=>`<option ${s.status===st?'selected':''}>${st}</option>`).join('')}</select></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${(view.length===0 && docBase.length>0) ? `<div class="empty-state" style="padding:24px"><div class="ic">🔍</div>ไม่พบเอกสารที่ตรงกับตัวกรอง</div>` : ''}
+      ${docBase.length===0 ? `<div class="empty-state" style="padding:24px"><div class="ic">📄</div>ยังไม่มีเอกสาร — เมื่อ CS กด Confirm shipment งานจะส่งมาที่นี่ทันที</div>` : ''}
+    </div>
+  `;
+
+  if(activeId){ const el = g(activeId); if(el){ el.focus(); try{ el.setSelectionRange(activeCursor, activeCursor); }catch(e){} } }
+  const wrap = g('doc_grid_wrap'); if(wrap) wrap.scrollLeft = _docScrollLeft;
+}
+
+// Inline editing — text cells save quietly (debounced, no re-render so focus
+// is never stolen mid-typing); date cells and country cells re-render so the
+// cut-off colouring and the ACI/AMS alert update immediately.
+window.updateCell = function(idx, field, val){
+  const s = shipments[idx]; if(!s) return;
+  s[field] = val;
+  scheduleSave();
+};
+// Like updateCell but re-renders — used by dropdown cells (e.g. AMS/ISF) so the
+// alert highlight clears the moment a value is chosen.
+window.updateCellRerender = function(idx, field, val){
+  const s = shipments[idx]; if(!s) return;
+  s[field] = val;
+  saveShipments();
+  rerenderGrid();
+};
+window.updateDate = function(idx, field, val){
+  const s = shipments[idx]; if(!s) return;
+  s[field] = val;
+  if(field==='etd') syncAutoStatus(s); // reaching ETD bumps status to LOAD
+  saveShipments();
+  rerenderGrid();
+};
+window.commitRerender = function(){ saveShipments(); rerenderGrid(); };
+// POD/FPOD changed — apply the AMS/ISF/ACI auto-default, then save + re-render.
+window.onCountryEdited = function(idx){
+  const s = shipments[idx]; if(!s) return;
+  applyAmsDefault(s);
+  saveShipments();
+  rerenderGrid();
+};
+
+// Typing in the trailing "+ ใหม่" row materialises a new shipment on the first
+// keystroke, then re-renders and returns focus to the same cell so the user can
+// keep typing — no "New Shipment" button/modal needed.
+window.setShipMonth = function(m){ _shipMonth = m; rememberScroll(); render_shipments(); };
+window.setShipCS = function(c){ _shipCS = c; rememberScroll(); render_shipments(); };
+
+window.newRowInput = function(field, val, el){
+  if(!String(val).length) return; // selecting the blank "—" option shouldn't create a row
+  // If a specific month/CS folder is open, seed those fields so the new row
+  // stays visible in the current folder (editable afterwards).
+  const seedEtd = (_shipMonth!=='all' && _shipMonth!=='Unknown') ? _shipMonth+'-01' : '';
+  const seedCS  = (_shipCS!=='all' && _shipCS!=='—') ? _shipCS : '';
+  const s = {
+    id: uid('ship'),
+    bookingNo:'', jobno:'', customer:'', sale:'', cs:seedCS, carrier:'',
+    por:'', pol:'', pod:'', fpod:'', vol:'', feeder:'', motherVsl:'', req:'', amsaci:'',
+    cy:'', rtn:'', si:'', vgm:'', bl:'', etd:seedEtd,
+    payment:{ap:false, ar:false}, status:'In Process',
+    bpdfData:{}, revisions:[], checklist:null,
+    statusHistory:[{status:'In Process', date:new Date().toISOString()}],
+  };
+  s[field] = val;
+  applyAmsDefault(s); // if POD/FPOD typed and non-US/CA, default AMS to NO
+  shipments.push(s);
+  saveShipments();
+  const pos = (el && el.type!=='date' && el.selectionStart!=null) ? el.selectionStart : String(val).length;
+  _focusAfterRender = { id:s.id, field, pos };
+  rememberScroll();
+  render_shipments();
+};
+
+window.changeShipmentStatus = function(idx, newStatus){
+  const s = shipments[idx]; if(!s) return;
+  if(newStatus==='Completed' && !allChecklistDone(s)){
+    toast('⚠ ต้องติ๊ก Checklist ให้ครบทุกข้อก่อน จึงจะปิดงาน (Completed) ได้');
+    rerenderGrid(); // revert the dropdown back to the real status
+    return;
+  }
+  s.status = newStatus;
+  if(!s.statusHistory) s.statusHistory = [];
+  s.statusHistory.push({status:newStatus, date:new Date().toISOString()});
+  saveShipments();
+  rerenderGrid();
+  toast('✅ Status updated: '+newStatus);
+};
+
+window.deleteShipment = function(idx){
+  const s = shipments[idx]; if(!s) return;
+  if(!confirm(`Delete shipment "${s.bookingNo||'this shipment'}"? This cannot be undone.`)) return;
+  shipments.splice(idx,1);
+  saveShipments();
+  rerenderGrid();
+  toast('🗑️ Deleted');
+};
+
+// AP/AR payment checklist — AP = paid the carrier, AR = collected from customer.
+window.openPaymentModal = function(idx){
+  g('payment_modal')?.remove();
+  const s = shipments[idx]; if(!s) return;
+  if(!s.payment) s.payment = {ap:false, ar:false};
+  const p = s.payment;
+  const row = (key,title,sub) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:8px;background:${p[key]?'var(--green-bg)':'var(--card2)'};cursor:pointer">
+      <input type="checkbox" ${p[key]?'checked':''} onchange="setPayment(${idx},'${key}',this.checked)" style="width:17px;height:17px;accent-color:var(--teal)">
+      <div><div style="font-weight:600;font-size:13px">${title}</div><div style="font-size:11px;color:var(--muted)">${sub}</div></div>
+    </label>`;
+  const body = `
+    <div class="modal-overlay open" id="payment_modal" style="z-index:950">
+      <div class="modal" style="max-width:400px">
+        <div class="modal-head"><h2>💵 AP / AR — ${escapeHtml(s.bookingNo||'(no booking no.)')}</h2><button class="btn-icon" onclick="closeModal('payment_modal');g('payment_modal').remove()">✕</button></div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+          ${row('ap','AP — จ่ายค่าเรือแล้ว','ทำจ่ายให้สายเรือ/ตัวแทนเรียบร้อย')}
+          ${row('ar','AR — เก็บเงินลูกค้าแล้ว','วางบิล/เก็บเงินจากลูกค้าเรียบร้อย')}
+        </div>
+        <div class="modal-foot"><button class="btn btn-primary" onclick="closeModal('payment_modal');g('payment_modal').remove();rerenderGrid()">เสร็จ</button></div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', body);
+};
+window.setPayment = function(idx, key, val){
+  const s = shipments[idx]; if(!s) return;
+  if(!s.payment) s.payment = {ap:false, ar:false};
+  s.payment[key] = val;
+  saveShipments();
+  // Refresh the active grid so the AP/AR badge + ETD alert update live
+  rerenderGrid();
+};
+
+/* ===== ISF (Importer Security Filing) — USA-bound shipments ===================
+   Builds an ISF-detail email the user can copy and send to the customer. Fields
+   are pre-filled from the shipment (vessel uses the Mother Vessel); anything not
+   in the system is editable and saved on the shipment as s.isfData. */
+const CARRIER_SCAC = {
+  'wan hai':'WHLC','wanhai':'WHLC','maersk':'MAEU','msc':'MSCU','mediterranean':'MSCU',
+  'cma':'CMDU','cma cgm':'CMDU','cosco':'COSU','evergreen':'EGLV','hapag':'HLCU',
+  'hapag-lloyd':'HLCU','one':'ONEY','ocean network':'ONEY','yang ming':'YMLU',
+  'hmm':'HDMU','oocl':'OOLU','zim':'ZIMU','pil':'PCIU','ts lines':'TSLU','ts line':'TSLU',
+  'sitc':'STLU','sm line':'SMLM','interasia':'IALU',
+};
+function carrierScac(name){
+  const n = (name||'').toLowerCase();
+  for(const k in CARRIER_SCAC){ if(n.includes(k)) return CARRIER_SCAC[k]; }
+  return '';
+}
+const ISF_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtIsfDate(v, style){ // 'short' = 04-JUN-26, 'long' = 04 JUN 2026
+  const dt = parseFlexibleDate(v); if(!dt) return '';
+  const d = String(dt.getDate()).padStart(2,'0'), m = ISF_MONTHS[dt.getMonth()], y = dt.getFullYear();
+  return style==='short' ? `${d}-${m}-${String(y).slice(2)}` : `${d} ${m} ${y}`;
+}
+function portCity(p){ return (p||'').split(/[,(]/)[0].trim(); } // "TAIPEI (TWTPE)" -> "TAIPEI"
+// Fill any missing ISF fields from the shipment (without overwriting edits).
+function isfDefaults(s){
+  const d = Object.assign({}, s.isfData||{});
+  const def = (k,v)=>{ if(d[k]===undefined || d[k]==='') d[k]=v; };
+  def('contact','');
+  def('shipmentNo', s.bookingNo||'');
+  def('scacHbl','DBGA');
+  def('hblNo','');
+  def('scacMbl', carrierScac(s.carrier));
+  def('mblRef', s.bookingNo||'');               // MBL base number (default = booking no)
+  def('vessel', s.motherVsl||'');               // เรือแม่
+  def('voyage','');
+  def('vesselFlag','');
+  def('pol', s.pol||'');
+  def('etdPol', fmtIsfDate(s.etd,'short'));
+  def('lastForeignPort', portCity(s.pol));
+  def('lastForeignEtd', fmtIsfDate(s.etd,'long'));
+  def('firstUsPort', portCity(s.pod));
+  def('etaUsa','');
+  d.amsNo = (d.scacHbl||'') + (d.hblNo||'');     // derived: SCAC HBL + HBL NO
+  d.mblNo = (d.scacMbl||'') + (d.mblRef||'');    // derived: SCAC MBL + MBL ref
+  return d;
+}
+function buildIsfText(d){
+  const pad = s => (s+':').padEnd(32,' ');
+  const L = (label,val) => pad(label) + (val||'');
+  return [
+    `Dear K. ${d.contact||''},`,
+    ``,
+    `Update M.V. of shipment ${d.shipmentNo||''} to ${d.vessel||''} V.${d.voyage||''}`,
+    `New ISF detail as below`,
+    ``,
+    L('AMS NO. ', d.amsNo),
+    L('SCAC CODE HBL ', d.scacHbl),
+    L('HBL NO ', d.hblNo),
+    L('SCAC CODE MBL', d.scacMbl),
+    L('MBL NO.', d.mblNo),
+    L('VESSEL', d.vessel),
+    L('VOYAGE', d.voyage),
+    L('VESSEL FLAG', d.vesselFlag),
+    L('PORT OF LOADING', d.pol),
+    L('ETD PORT OF LOADING', d.etdPol),
+    pad('LAST FOREIGN PORT BEFORE USA') + `${d.lastForeignPort||''}   ETD : ${d.lastForeignEtd||''}`,
+    pad('FIRST PORT CALLING IN USA') + `${d.firstUsPort||''}   ETA : ${d.etaUsa||''}`,
+  ].join('\n');
+}
+window.openIsfModal = function(idx){
+  g('isf_modal')?.remove();
+  const s = shipments[idx]; if(!s) return;
+  const d = isfDefaults(s);
+  s.isfData = d; saveShipments(); // persist the pre-filled defaults
+  const fld = (key,label,ph) => `
+    <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);font-weight:600">
+      ${escapeHtml(label)}
+      <input class="inp" style="font-size:12.5px" value="${escapeHtml(d[key]||'')}" placeholder="${escapeHtml(ph||'')}" oninput="updateIsf(${idx},'${key}',this.value)">
+    </label>`;
+  const body = `
+    <div class="modal-overlay open" id="isf_modal" style="z-index:950">
+      <div class="modal" style="max-width:860px">
+        <div class="modal-head">
+          <h2>🛃 ISF Detail — ${escapeHtml(s.bookingNo||'(no booking no.)')}</h2>
+          <button class="btn-icon" onclick="g('isf_modal').remove()">✕</button>
+        </div>
+        <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-weight:700;font-size:12px;color:var(--teal-dk)">รายละเอียด (ดึงจาก Shipment — แก้ไข/เพิ่มได้)</div>
+            ${fld('contact','Dear K. (ชื่อผู้รับ)','ชื่อลูกค้า')}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('shipmentNo','Shipment No.')}
+              ${fld('vessel','VESSEL (เรือแม่)')}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('voyage','VOYAGE')}
+              ${fld('vesselFlag','VESSEL FLAG')}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('scacHbl','SCAC CODE HBL')}
+              ${fld('hblNo','HBL NO')}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('scacMbl','SCAC CODE MBL')}
+              ${fld('mblRef','MBL Ref / Booking No.')}
+            </div>
+            <div style="font-size:11px;color:var(--muted)">MBL NO. = SCAC MBL + Ref → <b id="isf_mbl_preview" style="color:var(--ink)">${escapeHtml(d.mblNo||'—')}</b></div>
+            <div style="font-size:11px;color:var(--muted)">AMS NO. = SCAC HBL + HBL NO → <b id="isf_ams_preview" style="color:var(--ink)">${escapeHtml(d.amsNo||'—')}</b></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('pol','PORT OF LOADING')}
+              ${fld('etdPol','ETD PORT OF LOADING')}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('lastForeignPort','LAST FOREIGN PORT')}
+              ${fld('lastForeignEtd','  ETD')}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${fld('firstUsPort','FIRST PORT IN USA')}
+              ${fld('etaUsa','  ETA')}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-weight:700;font-size:12px;color:var(--teal-dk)">ตัวอย่างอีเมล (กด Copy ไปวางในเมล)</div>
+            <pre id="isf_preview" style="flex:1;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:14px;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;line-height:1.55;margin:0;overflow:auto;max-height:430px">${escapeHtml(buildIsfText(d))}</pre>
+          </div>
+        </div>
+        <div class="modal-foot" style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="g('isf_modal').remove()">ปิด</button>
+          <button class="btn btn-primary" onclick="copyIsf(${idx})">📋 Copy อีเมล</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', body);
+};
+window.updateIsf = function(idx, key, val){
+  const s = shipments[idx]; if(!s) return;
+  if(!s.isfData) s.isfData = {};
+  s.isfData[key] = val;
+  const d = isfDefaults(s); // recomputes amsNo & mblNo from parts
+  s.isfData.amsNo = d.amsNo; s.isfData.mblNo = d.mblNo;
+  saveShipments();
+  const pv = g('isf_preview'); if(pv) pv.textContent = buildIsfText(d);
+  const ap = g('isf_ams_preview'); if(ap) ap.textContent = d.amsNo||'—';
+  const mp = g('isf_mbl_preview'); if(mp) mp.textContent = d.mblNo||'—';
+};
+window.copyIsf = function(idx){
+  const s = shipments[idx]; if(!s) return;
+  const text = buildIsfText(isfDefaults(s));
+  const done = ()=>toast('📋 คัดลอกอีเมล ISF แล้ว');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  } else { fallbackCopy(text, done); }
+};
+function fallbackCopy(text, cb){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); cb&&cb(); }catch(e){ toast('❌ คัดลอกไม่สำเร็จ — เลือกข้อความเองได้'); }
+  document.body.removeChild(ta);
+}
+
+// Duplicates a shipment as a starting point for a new one — copies the
+// Booking Confirmation data (vessel, ports, cutoffs, etc.) as a preset so CS
+// doesn't have to retype everything for a repeat booking, but resets the
+// booking number, revision history, and checklist since those are specific
+// to the new shipment.
+// Sea Freight Pro and CS Ops Hub are both standalone local HTML files with
+// no server between them, so there's no URL we can open programmatically —
+// the browser has no way to know where the user saved the Sea Freight Pro
+// file. The practical bridge: copy the Job No. (falling back to Booking No.
+// if missing) to the clipboard, so the user can switch to their already-open
+// Sea Freight Pro tab (or open the file) and paste it into the SOP search box.
+window.openInSeaFreightProSop = function(idx){
+  const s = shipments[idx]; if(!s) return;
+  const valueToCopy = s.jobno || s.bookingNo || '';
+  if(!valueToCopy){ toast('⚠ Shipment นี้ยังไม่มี Job No. หรือ Booking No.'); return; }
+
+  const finish = (copied) => {
+    if(copied) toast('🔗 คัดลอก "'+valueToCopy+'" แล้ว — สลับไปแท็บ Sea Freight Pro แล้ววางในช่องค้นหาหน้า SOP ได้เลย');
+    else toast('⚠ คัดลอกอัตโนมัติไม่สำเร็จ — Job No. คือ "'+valueToCopy+'" กรุณาคัดลอกไปวางในช่องค้นหา SOP เอง');
+  };
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(valueToCopy).then(()=>finish(true)).catch(()=>finish(false));
+  } else {
+    finish(false);
+  }
+};
+
+window.duplicateShipment = function(idx){
+  const s = shipments[idx]; if(!s) return;
+  const copy = JSON.parse(JSON.stringify(s));
+  copy.id = uid('ship');
+  copy.bookingNo = ''; // must be a new booking number — don't carry the old one over
+  copy.status = 'In Process';
+  copy.statusHistory = [{status:'In Process', date:new Date().toISOString(), note:'Duplicated from '+(s.bookingNo||'previous shipment')}];
+  copy.revisions = [];
+  copy._revisedFields = [];
+  copy._bpdfFinalized = false;
+  copy.checklist = null;
+  copy.payment = {ap:false, ar:false}; // fresh payment state for the new booking
+  if(copy.bpdfData) copy.bpdfData.bkgno = ''; // booking no. inside the PDF preset too
+  shipments.unshift(copy);
+  saveShipments();
+  rerenderGrid();
+  toast('📑 Duplicated — กรอก Booking No. ใหม่ในแถวบนสุด');
+};
+
+// ═══════════════════════════════════════════════════════
+// EXPORT TO SEA FREIGHT PRO — produces a JSON file matching the job object
+// shape Sea Freight Pro expects from its own "📂 Import" button
+// ({jobs:[...]}), with every exported shipment forced to status "pending"
+// so CS reviews/confirms it there rather than it silently becoming Active.
+// ═══════════════════════════════════════════════════════
+
+// Sea Freight Pro's ETD/ETA fields are free-text display strings (e.g.
+// "15-Jul-2026"), not <input type=date> values — convert our YYYY-MM-DD.
+function toSfpDateDisplay(isoDate){
+  if(!isoDate) return '';
+  const d = new Date(isoDate+'T00:00:00');
+  if(isNaN(d)) return isoDate;
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return String(d.getDate()).padStart(2,'0')+'-'+MN[d.getMonth()]+'-'+d.getFullYear();
+}
+
+// Builds one Sea Freight Pro job object from a CS Ops Hub shipment. Every
+// field Sea Freight Pro's saveShipment() normally writes is included (even
+// if blank) so the imported record renders correctly in its Shipments list,
+// and status is always forced to 'pending' per the request.
+function cshubShipmentToSfpJob(s){
+  const d = s.bpdfData || {};
+  const pol = d.portLoading || s.pol || '';
+  const pod = d.finalDest || s.fpod || s.pod || '';
+  return {
+    no: s.bookingNo || ('BKG-'+uid('x').slice(-6).toUpperCase()),
+    jobno: s.jobno || '',
+    refno: d.shipperRef || '',
+    customer: s.customer || d.shipper || '',
+    shipper: d.shipper || s.customer || '',
+    etd: toSfpDateDisplay(s.etd), eta: toSfpDateDisplay(s.eta),
+    etdMonth: s.etd ? s.etd.slice(0,7) : 'Unknown',
+    etaMonth: s.eta ? s.eta.slice(0,7) : 'Unknown',
+    jobType: 'export', vessel: d.vsl||s.feeder||'', motherVessel: d.motherVsl||s.motherVsl||'',
+    voyage:'', motherVoy:'', remarks: d.specialRemark||s.req||'',
+    csAssigned: s.cs || s.sale || '', csTasks:'',
+    status: 'pending', // always Pending in Sea Freight Pro, regardless of CS Ops Hub status
+    chargeType:'',
+    sells:[], costs:[], sellsPerType:[], costsPerType:[],
+    sell:0, cost:0, profit:0, margin:0, comm:0, commThb:0,
+    carrier: s.carrier || d.carrier || '', incoterm:'', consignee:'',
+    bltype:'', sc:'', ams:'', commodity: d.commodity||'', hscode: d.hsCode||'',
+    cyDate: toSfpDateDisplay(s.cy)||'', rtnDate: toSfpDateDisplay(s.rtn)||'',
+    siCutoff: d.siCutoff || toSfpDateDisplay(s.si) || '',
+    vgmCutoff: d.vgmCutoff || toSfpDateDisplay(s.vgm) || '',
+    docCutoff: d.cfmBl || toSfpDateDisplay(s.bl) || '',
+    gateClosing: d.gateClosing || toSfpDateDisplay(s.cy) || '',
+    cyrtn:'', connote:'',
+    pol, pod, del: s.fpod || s.del || d.finalDest || '',
+    selCarrier: s.carrier||'', selLabel:'',
+    lkb:false, bkk:false,
+    ctnRows:[], q20:0, q40:0, q40hc:0,
+    chargeNames:[], thbFlags:[], aprFlags:[],
+    totalSell:0, totalCost:0,
+    statusHistory:[{status:'pending', date:new Date().toISOString(), note:'Imported from CS Ops Hub'}],
+  };
+}
+
+let _exportSfpSelected = new Set();
+let _exportSfpFilterSale = '';
+let _exportSfpFilterFrom = '';
+let _exportSfpFilterTo = '';
+
+window.openExportToSfpModal = function(){
+  g('export_sfp_modal')?.remove();
+  _exportSfpFilterSale = '';
+  _exportSfpFilterFrom = '';
+  _exportSfpFilterTo = '';
+  _exportSfpSelected = new Set(shipments.map((_,i)=>i)); // default: all selected
+
+  const body = `
+    <div class="modal-overlay open" id="export_sfp_modal" style="z-index:950">
+      <div class="modal" style="max-width:560px">
+        <div class="modal-head">
+          <h2>⬇ Export to Sea Freight Pro</h2>
+          <button class="btn-icon" onclick="closeModal('export_sfp_modal');g('export_sfp_modal').remove()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="font-size:11.5px;color:var(--slate);background:var(--card2);padding:10px 12px;border-radius:8px;margin-bottom:12px">
+            เลือก Shipment ที่จะ export — ทุก Shipment จะถูกตั้ง Status เป็น <b>Pending</b> ในไฟล์ที่ export ออกไป (ไม่กระทบ Status ที่แสดงอยู่ใน CS Ops Hub) นำไฟล์ที่ได้ไปกด "📂 Import" ใน Sea Freight Pro
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div class="inp-group"><label class="inp-lbl">Sale</label><input id="export_sfp_sale" class="inp" placeholder="ค้นหาชื่อ Sale…" style="font-size:12px;padding:6px 9px" value="${escapeHtml(_exportSfpFilterSale)}" oninput="onExportSfpFilterChange()"></div>
+            <div class="inp-group"><label class="inp-lbl">ETD จาก</label><input type="date" id="export_sfp_from" class="inp" style="font-size:12px;padding:6px 9px" value="${_exportSfpFilterFrom}" onchange="onExportSfpFilterChange()"></div>
+            <div class="inp-group"><label class="inp-lbl">ถึง</label><input type="date" id="export_sfp_to" class="inp" style="font-size:12px;padding:6px 9px" value="${_exportSfpFilterTo}" onchange="onExportSfpFilterChange()"></div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">
+              <input type="checkbox" id="export_sfp_selectall" checked onchange="toggleExportSfpSelectAll(this.checked)" style="width:15px;height:15px">
+              เลือกทั้งหมดที่แสดง
+            </label>
+            <span id="export_sfp_count" style="font-size:11.5px;color:var(--muted)"></span>
+          </div>
+          <div id="export_sfp_list" style="max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="closeModal('export_sfp_modal');g('export_sfp_modal').remove()">Cancel</button>
+          <button class="btn btn-primary" onclick="exportSelectedToSfp()">⬇ Export JSON</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', body);
+  renderExportSfpList();
+};
+
+// Returns the indices (into the global `shipments` array) of shipments that
+// match the current Sale-name and ETD date-range filters in the export modal.
+function getFilteredExportSfpIndices(){
+  const saleQ = (_exportSfpFilterSale||'').toLowerCase();
+  const from = _exportSfpFilterFrom;
+  const to = _exportSfpFilterTo;
+  return shipments.map((s,i)=>i).filter(i=>{
+    const s = shipments[i];
+    if(saleQ && !(s.sale||'').toLowerCase().includes(saleQ)) return false;
+    if(from && (!s.etd || s.etd < from)) return false;
+    if(to && (!s.etd || s.etd > to)) return false;
+    return true;
+  });
+}
+
+function renderExportSfpList(){
+  const filteredIdx = getFilteredExportSfpIndices();
+  const listEl = g('export_sfp_list');
+  if(!listEl) return;
+
+  listEl.innerHTML = filteredIdx.length ? filteredIdx.map(i=>{
+    const s = shipments[i];
+    const checked = _exportSfpSelected.has(i);
+    return `
+      <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer">
+        <input type="checkbox" class="export-sfp-chk" data-idx="${i}" ${checked?'checked':''} onchange="onExportSfpCheckChange(${i}, this.checked)" style="width:15px;height:15px;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--mono);font-weight:700;font-size:12px;color:var(--teal-dk)">${escapeHtml(s.bookingNo||'(no booking no.)')}</div>
+          <div style="font-size:11px;color:var(--muted)">${escapeHtml(s.customer||'—')}${s.sale?' · Sale: '+escapeHtml(s.sale):''}${s.etd?' · ETD: '+fmtDate(s.etd):''}</div>
+        </div>
+        <span class="badge ${STATUS_COLOR[s.status]||'badge-gray'}" style="flex-shrink:0">${s.status}</span>
+      </label>
+    `;
+  }).join('') : `<div class="empty-state" style="padding:24px"><div class="ic">📦</div>${shipments.length ? 'No shipments match this filter' : 'No shipments to export yet'}</div>`;
+
+  updateExportSfpCount();
+}
+
+window.onExportSfpFilterChange = function(){
+  _exportSfpFilterSale = g('export_sfp_sale')?.value || '';
+  _exportSfpFilterFrom = g('export_sfp_from')?.value || '';
+  _exportSfpFilterTo = g('export_sfp_to')?.value || '';
+  // Re-sync selection to exactly match what the filter now shows — prevents
+  // shipments that are hidden by the filter from silently staying selected
+  // (and being exported) when the user thinks only the visible ones are.
+  _exportSfpSelected = new Set(getFilteredExportSfpIndices());
+  renderExportSfpList();
+};
+
+function updateExportSfpCount(){
+  const filteredIdx = getFilteredExportSfpIndices();
+  const selectedInView = filteredIdx.filter(i=>_exportSfpSelected.has(i));
+  const countEl = g('export_sfp_count');
+  if(countEl) countEl.textContent = _exportSfpSelected.size+' selected total ('+selectedInView.length+' shown)';
+  const allBox = g('export_sfp_selectall');
+  if(allBox) allBox.checked = filteredIdx.length>0 && selectedInView.length === filteredIdx.length;
+}
+
+window.toggleExportSfpSelectAll = function(checked){
+  const filteredIdx = getFilteredExportSfpIndices();
+  filteredIdx.forEach(i=>{
+    if(checked) _exportSfpSelected.add(i);
+    else _exportSfpSelected.delete(i);
+  });
+  renderExportSfpList();
+};
+
+window.onExportSfpCheckChange = function(idx, checked){
+  if(checked) _exportSfpSelected.add(idx);
+  else _exportSfpSelected.delete(idx);
+  updateExportSfpCount();
+};
+
+window.exportSelectedToSfp = function(){
+  const selectedIdx = Array.from(_exportSfpSelected).sort((a,b)=>a-b);
+  if(!selectedIdx.length){ toast('กรุณาเลือก Shipment อย่างน้อย 1 รายการ'); return; }
+
+  const jobs = selectedIdx.map(i=>cshubShipmentToSfpJob(shipments[i]));
+  const payload = { jobs };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `cshub_export_to_seafreightpro_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  closeModal('export_sfp_modal'); g('export_sfp_modal')?.remove();
+  toast('⬇ Exported '+jobs.length+' shipment(s) — all set to Pending');
+};
+
+// ── Add/Edit Shipment Modal removed ──
+// Shipments are now created and edited directly in the Excel-style grid on the
+// Shipments page (see render_shipments + updateCell/updateDate/newRowInput),
+// so the old "+ New Shipment" modal and its save handler are gone to avoid two
+// parallel data-entry paths.
+
+
+
+// ═══════════════════════════════════════════════════════
+// BOOKING PDF CONFIRMATION — with Terminal selector + Revise tracking
+// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// BOOKING PDF CONFIRMATION — matches Sea Freight Pro's exact PDF layout,
+// plus Terminal/Depot selector and Revise tracking
+// ═══════════════════════════════════════════════════════
+const BPDF_FIELDS = [
+  'shipper','shipperRef','bkgno','carrier','vsl','motherVsl','etd','eta',
+  'portReceive','portDischarge','portLoading','finalDest','portTransit','volume',
+  'siCutoff','cfmBl','vgmCutoff','gateClosing','paperless',
+  'puRef','puDate','puTerminalId','puTerminalFree','puPic',
+  'tiRef','tiDate','tiTerminalId','tiTerminalFree','tiPic',
+  'commodity','weight','hsCode','specialRemark',
+];
+
+let _bpdfShipIdx = null;
+
+function terminalOptionsHtml(selectedId){
+  return `<option value="">— เลือกจากรายการ —</option>` +
+    terminals.map(t=>`<option value="${t.id}" ${selectedId===t.id?'selected':''}>${escapeHtml(t.type)}: ${escapeHtml(t.name)}</option>`).join('') +
+    `<option value="__other__">+ พิมพ์เอง / อื่นๆ…</option>`;
+}
+
+function bf(s, key){ // input value, falling back to '' — shorthand for the modal template
+  return escapeHtml((s.bpdfData||{})[key] || '');
+}
+function brv(s, key){ // returns 'revised-field' class if this field changed in the latest revision
+  return (s._revisedFields||[]).includes(key) ? 'revised-field' : '';
+}
+
+window.openBookingPdfModal = function(idx){
+  g('bpdf_modal')?.remove(); // remove any stale instance first (prevents duplicate-ID bugs)
+  _bpdfShipIdx = idx;
+  const s = shipments[idx]; if(!s) return;
+  if(!s.bpdfData) s.bpdfData = {};
+  if(!s.revisions) s.revisions = [];
+  const revCount = s.revisions.length;
+
+  // The Booking Confirmation is the TABLE's mirror. Every field the grid owns is
+  // refreshed from the current row each time the modal opens (overwriting any
+  // stale value held in bpdfData) so the table is always the single source of
+  // truth. Pick Up / Turn-In Ref are tied to the Booking No. Fields that exist
+  // only in this form (Shipper Ref., vessel voy details, pickup/turn-in dates &
+  // places, PIC, commodity, weight, HS code, remarks…) are kept from bpdfData.
+  const gridLinked = {
+    bkgno:       s.bookingNo||'',
+    carrier:     s.carrier||'',
+    vsl:         s.feeder||'',
+    motherVsl:   s.motherVsl||'',
+    portReceive: s.por||s.pol||'',
+    portLoading: s.pol||'',
+    portDischarge: s.pod||'',
+    finalDest:   s.fpod||s.del||s.pod||'',
+    volume:      s.vol||'',
+    etd:         s.etd ? toSfpDateDisplay(s.etd) : '',
+    siCutoff:    s.si  ? toSfpDateDisplay(s.si)  : '',
+    vgmCutoff:   s.vgm ? toSfpDateDisplay(s.vgm) : '',
+    cfmBl:       s.bl  ? toSfpDateDisplay(s.bl)  : '',
+    gateClosing: s.cy  ? toSfpDateDisplay(s.cy)  : '',
+    puRef:       s.bookingNo||'',  // Pick Up Ref. follows the Booking No.
+    tiRef:       s.bookingNo||'',  // Turn-In Ref. follows the Booking No.
+  };
+  // Table always wins for the linked fields (overwrite even if it clears a value);
+  // everything else stays as previously entered in the booking form.
+  const d0 = { ...(s.bpdfData||{}), ...gridLinked };
+  if(!d0.shipper) d0.shipper = s.customer||''; // Shipper may differ, so only fill when empty
+
+  // Every booking field renders from the merged d0 object, so the form always
+  // reflects the linked grid values (plus booking-only data) consistently.
+  const dv = (k)=>escapeHtml(d0[k]!==undefined && d0[k]!==null ? d0[k] : '');
+
+  const body = `
+    <div class="modal-overlay open" id="bpdf_modal" style="z-index:950">
+      <div class="modal" style="max-width:760px">
+        <div class="modal-head">
+          <h2>📄 Booking Confirmation — ${escapeHtml(s.bookingNo||'')}</h2>
+          <button class="btn-icon" onclick="closeModal('bpdf_modal');g('bpdf_modal').remove()">✕</button>
+        </div>
+        <div class="modal-body" id="bpdf_form_container" style="display:grid;grid-template-columns:1fr 1fr;gap:12px" oninput="markFieldRevised(event)">
+
+          ${isCanadaBoundShipment(s) ? `
+          <div class="inp-group full-col" style="background:var(--red-bg);padding:10px 12px;border-radius:8px;font-size:12px;color:var(--red);font-weight:700;display:flex;align-items:center;gap:8px">
+            🇨🇦 ACI filing required — this shipment is bound for Canada. File Advance Commercial Information before the cargo crosses the border.
+          </div>
+          ` : ''}
+
+          <div class="inp-group full-col" style="background:var(--card2);padding:10px 12px;border-radius:8px;font-size:11.5px;color:var(--slate);display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span>${revCount>0
+              ? `<b style="color:var(--red)">⚠ Revised ${revCount} time(s)</b> — fields changed since the previous export are highlighted in yellow.`
+              : `Editing after the first export/save will mark changed fields and add a Revised banner to the PDF.`}</span>
+            ${revCount>0 ? `<button class="btn btn-sm btn-ghost" onclick="clearBpdfRevisions()" style="flex-shrink:0">🧹 ล้างการ Revise</button>` : ''}
+          </div>
+
+          <div class="inp-group full-col" style="border-top:1px dashed var(--line2);padding-top:10px"><label class="inp-lbl" style="color:var(--ink)">Shipper / Booking</label></div>
+          <div class="inp-group"><label class="inp-lbl">Shipper Name</label><input id="bpdf_shipper" class="inp ${brv(s,'shipper')}" value="${dv('shipper')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Shipper Ref.</label><input id="bpdf_shipperRef" class="inp ${brv(s,'shipperRef')}" value="${dv('shipperRef')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Booking No.</label><input id="bpdf_bkgno" class="inp ${brv(s,'bkgno')}" value="${dv('bkgno')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Shipping Line</label><input id="bpdf_carrier" class="inp ${brv(s,'carrier')}" value="${dv('carrier')}"></div>
+
+          <div class="inp-group full-col" style="border-top:1px dashed var(--line2);padding-top:10px"><label class="inp-lbl" style="color:var(--ink)">Schedule Information</label></div>
+          <div class="inp-group"><label class="inp-lbl">VSL Name / Voy</label><input id="bpdf_vsl" class="inp ${brv(s,'vsl')}" value="${dv('vsl')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Mother VSL Name / Voy</label><input id="bpdf_motherVsl" class="inp ${brv(s,'motherVsl')}" value="${dv('motherVsl')}"></div>
+          <div class="inp-group"><label class="inp-lbl">ETD</label><input id="bpdf_etd" class="inp ${brv(s,'etd')}" value="${dv('etd')}" placeholder="e.g. 15-Jul-2026"></div>
+          <div class="inp-group"><label class="inp-lbl">ETA</label><input id="bpdf_eta" class="inp ${brv(s,'eta')}" value="${dv('eta')}" placeholder="e.g. 02-Aug-2026"></div>
+          <div class="inp-group"><label class="inp-lbl">Port of Receive</label><input id="bpdf_portReceive" class="inp ${brv(s,'portReceive')}" value="${dv('portReceive')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Port of Discharge</label><input id="bpdf_portDischarge" class="inp ${brv(s,'portDischarge')}" value="${dv('portDischarge')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Port of Loading</label><input id="bpdf_portLoading" class="inp ${brv(s,'portLoading')}" value="${dv('portLoading')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Final Destination</label><input id="bpdf_finalDest" class="inp ${brv(s,'finalDest')}" value="${dv('finalDest')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Port of Transit</label><input id="bpdf_portTransit" class="inp ${brv(s,'portTransit')}" value="${dv('portTransit')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Volume</label><input id="bpdf_volume" class="inp ${brv(s,'volume')}" value="${dv('volume')}" placeholder="e.g. 2x40HC"></div>
+
+          <div class="inp-group full-col" style="border-top:1px dashed var(--line2);padding-top:10px"><label class="inp-lbl" style="color:var(--ink)">Cut-off Times</label></div>
+          <div class="inp-group"><label class="inp-lbl">SI Cut-off time</label><input id="bpdf_siCutoff" class="inp ${brv(s,'siCutoff')}" value="${dv('siCutoff')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Dead Line CFM BL</label><input id="bpdf_cfmBl" class="inp ${brv(s,'cfmBl')}" value="${dv('cfmBl')}"></div>
+          <div class="inp-group"><label class="inp-lbl">VGM Cut-off time</label><input id="bpdf_vgmCutoff" class="inp ${brv(s,'vgmCutoff')}" value="${dv('vgmCutoff')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Gate Closing Date</label><input id="bpdf_gateClosing" class="inp ${brv(s,'gateClosing')}" value="${dv('gateClosing')}"></div>
+          <div class="inp-group full-col"><label class="inp-lbl">Paperless Code</label><input id="bpdf_paperless" class="inp ${brv(s,'paperless')}" value="${dv('paperless')}"></div>
+
+          <div class="inp-group full-col" style="border-top:1px dashed var(--line2);padding-top:10px"><label class="inp-lbl" style="color:var(--ink)">Pick Up</label></div>
+          <div class="inp-group"><label class="inp-lbl">Pick Up Ref.</label><input id="bpdf_puRef" class="inp ${brv(s,'puRef')}" value="${dv('puRef')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Pick Up Date</label><input id="bpdf_puDate" class="inp ${brv(s,'puDate')}" value="${dv('puDate')}" placeholder="e.g. 19-Jun-2026"></div>
+          <div class="inp-group full-col">
+            <label class="inp-lbl">Pick Up Place (Terminal / Depot)</label>
+            <select id="bpdf_puTerminalId" class="inp ${brv(s,'puTerminalId')}" onchange="onTerminalSelectChange('pu')">
+              ${terminalOptionsHtml((s.bpdfData||{}).puTerminalId)}
+            </select>
+            <div id="bpdf_puTerminalFree_wrap" style="display:${(s.bpdfData||{}).puTerminalId?'none':'flex'};gap:6px;margin-top:6px">
+              <input id="bpdf_puTerminalFree" class="inp ${brv(s,'puTerminalFree')}" placeholder="หรือพิมพ์ชื่อ/ที่อยู่เอง ถ้าไม่มีในรายการ" value="${dv('puTerminalFree')}" style="flex:1">
+              <select id="bpdf_puTerminalFree_type" class="inp" style="width:90px;flex-shrink:0">
+                <option value="Depot">Depot</option>
+                <option value="Terminal">Terminal</option>
+              </select>
+              <button type="button" class="btn btn-sm btn-ghost" onclick="saveTerminalFromBpdf('pu')" title="บันทึกเข้ารายการ Terminal/Depot" style="flex-shrink:0">💾</button>
+            </div>
+          </div>
+          <div class="inp-group full-col"><label class="inp-lbl">Pick Up PIC.</label><input id="bpdf_puPic" class="inp ${brv(s,'puPic')}" value="${dv('puPic')}"></div>
+
+          <div class="inp-group full-col" style="border-top:1px dashed var(--line2);padding-top:10px"><label class="inp-lbl" style="color:var(--ink)">Turn-In</label></div>
+          <div class="inp-group"><label class="inp-lbl">Turn-In Ref.</label><input id="bpdf_tiRef" class="inp ${brv(s,'tiRef')}" value="${dv('tiRef')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Turn-In Date</label><input id="bpdf_tiDate" class="inp ${brv(s,'tiDate')}" value="${dv('tiDate')}" placeholder="e.g. 23-Jun-2026"></div>
+          <div class="inp-group full-col">
+            <label class="inp-lbl">Turn-In At (Terminal / Depot)</label>
+            <select id="bpdf_tiTerminalId" class="inp ${brv(s,'tiTerminalId')}" onchange="onTerminalSelectChange('ti')">
+              ${terminalOptionsHtml((s.bpdfData||{}).tiTerminalId)}
+            </select>
+            <div id="bpdf_tiTerminalFree_wrap" style="display:${(s.bpdfData||{}).tiTerminalId?'none':'flex'};gap:6px;margin-top:6px">
+              <input id="bpdf_tiTerminalFree" class="inp ${brv(s,'tiTerminalFree')}" placeholder="หรือพิมพ์ชื่อ/ที่อยู่เอง ถ้าไม่มีในรายการ" value="${dv('tiTerminalFree')}" style="flex:1">
+              <select id="bpdf_tiTerminalFree_type" class="inp" style="width:90px;flex-shrink:0">
+                <option value="Terminal">Terminal</option>
+                <option value="Depot">Depot</option>
+              </select>
+              <button type="button" class="btn btn-sm btn-ghost" onclick="saveTerminalFromBpdf('ti')" title="บันทึกเข้ารายการ Terminal/Depot" style="flex-shrink:0">💾</button>
+            </div>
+          </div>
+          <div class="inp-group full-col"><label class="inp-lbl">Turn-In PIC.</label><input id="bpdf_tiPic" class="inp ${brv(s,'tiPic')}" value="${dv('tiPic')}"></div>
+
+          <div class="inp-group full-col" style="border-top:1px dashed var(--line2);padding-top:10px"><label class="inp-lbl" style="color:var(--ink)">Cargo</label></div>
+          <div class="inp-group"><label class="inp-lbl">Commodity</label><input id="bpdf_commodity" class="inp ${brv(s,'commodity')}" value="${dv('commodity')}"></div>
+          <div class="inp-group"><label class="inp-lbl">Weight</label><input id="bpdf_weight" class="inp ${brv(s,'weight')}" value="${dv('weight')}"></div>
+          <div class="inp-group full-col"><label class="inp-lbl">HS. Code</label><input id="bpdf_hsCode" class="inp ${brv(s,'hsCode')}" value="${d0.hsCode!==undefined&&d0.hsCode!==''?dv('hsCode'):'Please advise'}"></div>
+          <div class="inp-group full-col"><label class="inp-lbl">Special Cargo Remark</label><textarea id="bpdf_specialRemark" class="inp ${brv(s,'specialRemark')}" rows="2">${dv('specialRemark')}</textarea></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="closeModal('bpdf_modal');g('bpdf_modal').remove()">Close</button>
+          <button class="btn btn-ghost" onclick="saveBpdfData(false)">💾 Save</button>
+          <button class="btn btn-primary" onclick="generateBookingPDF()">⬇ Export PDF</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', body);
+};
+
+window.markFieldRevised = function(ev){
+  // Live-highlight as the user types, only meaningful after at least one save exists
+  const s = shipments[_bpdfShipIdx];
+  if(!s || !s.bpdfData || Object.keys(s.bpdfData).length===0) return; // nothing saved yet — first entry, not a revision
+  const id = ev.target.id;
+  if(!id || !id.startsWith('bpdf_')) return;
+  ev.target.classList.add('revised-field');
+};
+
+function collectBpdfForm(){
+  return {
+    shipper: g('bpdf_shipper').value.trim(), shipperRef: g('bpdf_shipperRef').value.trim(),
+    bkgno: g('bpdf_bkgno').value.trim(), carrier: g('bpdf_carrier').value.trim(),
+    vsl: g('bpdf_vsl').value.trim(), motherVsl: g('bpdf_motherVsl').value.trim(),
+    etd: g('bpdf_etd').value.trim(), eta: g('bpdf_eta').value.trim(),
+    portReceive: g('bpdf_portReceive').value.trim(), portDischarge: g('bpdf_portDischarge').value.trim(),
+    portLoading: g('bpdf_portLoading').value.trim(), finalDest: g('bpdf_finalDest').value.trim(),
+    portTransit: g('bpdf_portTransit').value.trim(), volume: g('bpdf_volume').value.trim(),
+    siCutoff: g('bpdf_siCutoff').value.trim(), cfmBl: g('bpdf_cfmBl').value.trim(),
+    vgmCutoff: g('bpdf_vgmCutoff').value.trim(), gateClosing: g('bpdf_gateClosing').value.trim(),
+    paperless: g('bpdf_paperless').value.trim(),
+    puRef: g('bpdf_puRef').value.trim(), puDate: g('bpdf_puDate').value.trim(),
+    puTerminalId: g('bpdf_puTerminalId').value, puTerminalFree: g('bpdf_puTerminalFree').value.trim(),
+    puPic: g('bpdf_puPic').value.trim(),
+    tiRef: g('bpdf_tiRef').value.trim(), tiDate: g('bpdf_tiDate').value.trim(),
+    tiTerminalId: g('bpdf_tiTerminalId').value, tiTerminalFree: g('bpdf_tiTerminalFree').value.trim(),
+    tiPic: g('bpdf_tiPic').value.trim(),
+    commodity: g('bpdf_commodity').value.trim(), weight: g('bpdf_weight').value.trim(),
+    hsCode: g('bpdf_hsCode').value.trim(), specialRemark: g('bpdf_specialRemark').value.trim(),
+  };
+}
+
+// Handles the Pick Up / Turn-In Terminal dropdown changing — shows the
+// free-text entry (with Save button) when "+ พิมพ์เอง / อื่นๆ…" is chosen,
+// and clears the placeholder __other__ value so it never gets saved as a
+// real terminal id.
+window.onTerminalSelectChange = function(prefix){
+  const sel = g('bpdf_'+prefix+'TerminalId');
+  const wrap = g('bpdf_'+prefix+'TerminalFree_wrap');
+  const freeInput = g('bpdf_'+prefix+'TerminalFree');
+  const picInput = g('bpdf_'+prefix+'Pic');
+  if(sel.value === '__other__'){
+    sel.value = ''; // don't let __other__ leak into the saved data as a fake terminal id
+    wrap.style.display = 'flex';
+    if(freeInput){ freeInput.value=''; freeInput.focus(); }
+    if(picInput) picInput.value = '';
+  } else if(sel.value === ''){
+    wrap.style.display = 'none';
+    if(picInput) picInput.value = '';
+  } else {
+    wrap.style.display = 'none';
+    // Auto-fill the PIC field from the selected terminal/depot's saved contact
+    const t = terminals.find(x=>x.id===sel.value);
+    if(picInput) picInput.value = t?.contact || '';
+  }
+};
+
+function terminalText(terminalId, freeText){
+  if(terminalId){
+    const t = terminals.find(x=>x.id===terminalId);
+    if(t) return `${t.name}${t.address?' — '+t.address:''}`;
+  }
+  return freeText || '';
+}
+
+// Saves whatever the user typed in the Pick Up / Turn-In free-text field into
+// the shared Terminal/Depot library, then switches that field's dropdown to
+// point at the newly-saved entry — so it can be reused on future shipments
+// without retyping.
+window.saveTerminalFromBpdf = function(prefix){ // prefix is 'pu' or 'ti'
+  const freeInput = g('bpdf_'+prefix+'TerminalFree');
+  const typeSelect = g('bpdf_'+prefix+'TerminalFree_type');
+  const idSelect = g('bpdf_'+prefix+'TerminalId');
+  const wrap = g('bpdf_'+prefix+'TerminalFree_wrap');
+  const picInput = g('bpdf_'+prefix+'Pic');
+  const val = (freeInput?.value||'').trim();
+  if(!val){ toast('กรุณาพิมพ์ชื่อ/ที่อยู่ Terminal หรือ Depot ก่อนบันทึก'); return; }
+
+  // Avoid creating a duplicate if this exact name was already saved
+  let t = terminals.find(x=>x.name.toLowerCase() === val.toLowerCase());
+  if(!t){
+    // Carry over whatever PIC contact is currently typed in the form, so it's
+    // not lost — the next time this terminal is selected it'll auto-fill.
+    t = { id: uid('term'), type: typeSelect.value, name: val, address:'', contact:(picInput?.value||'').trim(), notes:'' };
+    terminals.unshift(t);
+    saveTerminals();
+    toast('💾 บันทึก "'+val+'" เข้ารายการ '+typeSelect.value+' แล้ว');
+  } else {
+    toast('มีรายการนี้อยู่แล้ว — เลือกให้ใช้รายการที่บันทึกไว้');
+  }
+
+  // Re-render the dropdown options and select the (newly-saved or existing) entry
+  idSelect.innerHTML = terminalOptionsHtml(t.id);
+  idSelect.value = t.id;
+  wrap.style.display = 'none';
+};
+
+// Saves the form. If this is not the first save, diffs against the previous
+// snapshot, records which fields changed, bumps the revision counter, and
+// remembers the changed-field list so the PDF/modal can highlight them.
+window.saveBpdfData = function(silent){
+  const s = shipments[_bpdfShipIdx]; if(!s) return;
+  const newData = collectBpdfForm();
+  // Only treat this as a "revision" if the data was previously finalized
+  // (i.e. the user had already clicked Save or Export at least once) —
+  // otherwise auto-save firing mid-typing on the very first entry would
+  // incorrectly count as a revision.
+  const wasFinalized = !!s._bpdfFinalized;
+
+  if(wasFinalized){
+    const changed = BPDF_FIELDS.filter(f => JSON.stringify(s.bpdfData[f]||'') !== JSON.stringify(newData[f]||''));
+    if(changed.length){
+      s.revisions.push({ at:new Date().toISOString(), changedFields:changed, previous:{...s.bpdfData} });
+      s._revisedFields = changed;
+    }
+  }
+  s.bpdfData = newData;
+  if(!silent) s._bpdfFinalized = true; // explicit Save/Export marks this version as "official"
+  saveShipments();
+  if(!silent){ toast('💾 Saved'); rerenderGrid(); }
+};
+
+// Clears all revision history for this shipment's booking PDF and resets the
+// counter back to 0 — lets CS start fresh if a shipment was set up wrong.
+window.clearBpdfRevisions = function(){
+  const s = shipments[_bpdfShipIdx]; if(!s) return;
+  if(!confirm('ล้างประวัติการ Revise ทั้งหมด และเริ่มนับใหม่จาก 1? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+  s.revisions = [];
+  s._revisedFields = [];
+  s._bpdfFinalized = false;
+  saveShipments();
+  toast('🧹 ล้างประวัติ Revise แล้ว');
+  openBookingPdfModal(_bpdfShipIdx); // re-render modal to drop highlights & banner
+};
+
+// Auto-save (debounced) while typing so data isn't lost if the modal is closed
+// without clicking Save/Export.
+let _bpdfAutosaveTimer = null;
+document.addEventListener('input', function(ev){
+  if(!ev.target.id || !ev.target.id.startsWith('bpdf_')) return;
+  clearTimeout(_bpdfAutosaveTimer);
+  _bpdfAutosaveTimer = setTimeout(()=>{ if(_bpdfShipIdx!==null) saveBpdfData(true); }, 600);
+});
+
+function gv(s, key){ return ((s.bpdfData||{})[key] || '').toString(); }
+
+// ── Export to PDF — exact layout match with Sea Freight Pro's Booking Confirmation ──
+window.generateBookingPDF = function(){
+  saveBpdfData(true);
+  const s = shipments[_bpdfShipIdx]; if(!s) return;
+  s._bpdfFinalized = true; // exporting also marks this version as "official" for revision tracking
+  saveShipments();
+  if(!window.jspdf){ toast('⏳ jsPDF loading... please try again'); return; }
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ toast('❌ jsPDF not loaded'); return; }
+  toast('⏳ Generating PDF...');
+
+  const d = s.bpdfData||{};
+  const revisedFields = s._revisedFields || [];
+  const revCount = (s.revisions||[]).length;
+  const isRevised = revCount > 0;
+  const isRev = key => revisedFields.includes(key);
+
+  const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+  const W=210, H=297, LM=12, RM=198, TW=RM-LM;
+
+  const BLK=[0,0,0], RED=[192,0,0], BLUE=[0,90,192], DKBLUE=[0,51,153];
+  const LGRAY=[224,224,224], LBLUE=[191,222,242], YELLOW=[255,255,153], REVYELLOW=[255,242,140];
+
+  function hline(y, x1, x2, w=0.3){ doc.setDrawColor(...BLK); doc.setLineWidth(w); doc.line(x1||LM,y,x2||RM,y); }
+  function rect(x,y,w,h,fc=null,stroke=true,lw=0.3){
+    if(fc){ doc.setFillColor(...fc); doc.rect(x,y,w,h,'F'); }
+    if(stroke){ doc.setDrawColor(...BLK); doc.setLineWidth(lw); doc.rect(x,y,w,h,'S'); }
+  }
+  function t(text, x, y, sz=8, bold=false, col=BLK, align='left'){
+    doc.setFontSize(sz); doc.setFont('helvetica', bold?'bold':'normal');
+    doc.setTextColor(...col);
+    if(align==='center') doc.text(String(text||''), x, y, {align:'center'});
+    else if(align==='right') doc.text(String(text||''), x, y, {align:'right'});
+    else doc.text(String(text||''), x, y);
+  }
+  function wrapLines(text, maxW, sz){
+    doc.setFontSize(sz);
+    return doc.splitTextToSize(String(text||''), maxW);
+  }
+  // Draws a small yellow highlight rectangle behind a value if that field was
+  // part of the latest revision — the visual cue requested for the Revise feature.
+  function revHighlight(key, x, y, w, h){
+    if(!isRev(key)) return;
+    doc.setFillColor(...REVYELLOW);
+    doc.rect(x, y, w, h, 'F');
+    doc.setDrawColor(...RED); doc.setLineWidth(0.25);
+    doc.rect(x, y, w, h, 'S');
+  }
+
+  let y = 10;
+  const HEADER_H = 26;
+
+  // Company Logo (same artwork as Sea Freight Pro)
+  const LOGO_DATA = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACKAOwDASIAAhEBAxEB/8QAHAABAAIDAQEBAAAAAAAAAAAAAAUHBAYIAwEC/8QANxAAAQQBAwIEBAUCBQUAAAAAAQACAwQFBhESByETMUFRFCJhcRUjMmKBUpEIM0JyoSSxssHR/8QAGgEBAAMBAQEAAAAAAAAAAAAAAAIDBAUBBv/EADERAAIBAwIEAgkEAwAAAAAAAAABAgMEESExBRJBUWHBBhMUInGBobHwFTOR4SMyUv/aAAwDAQACEQMRAD8A7LREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBEX5keyON0kj2sY0buc47ABAfpFjUL1O9AJ6dmOeN3k5jtwe+yyUaa0Z4mmsoIiIehERAEREAREQBERAEREAREQBERAEREAREQBERAEREARU1r/XmudFaxFC3Fg7WLyD3yY6aeTwSGtG5id+7uAHLwx/WXK5KASQ4arA0xue4kve6HY7BjwB8ruxPfsQtTs6vJ6xar4lCuIOfJ12LezeUpYbHSX78pjhZ27NLnOPoAB5kql9Zawt6kyRrUbTqTQ0MqVpJms8SUkD5tt9+x3JPZv37qD1tmMhmHPyOQfalqxMYHzsdH4VYF23cA/wDAG591DN4y1rMlGarkMPKxpmnnAitzcNt2RNHdo9tvPutVkqEKCuqjwvH838N2Y+IU7qd07KnHMtsLr/XjsupsOAyuSqXpvw+7FiMkyR/4jNO1z68oDtmsY49u3fy89/orV0Dr+nqQSwXKxxduN4ayKZ4/OB9WH1/hUrUm+K0/8RK7bSlZ4bNjXS8rAd2+dp8z8zt+X3XyoyC2+vk8pK+vgK7JI8TZc/ZzXtO7I3bdz3810FSt76iqsNns19vF+HRbM41Srd8Kunb1FrHRpv69cLx6vdHUCKpsH1E1HFSqMyGPx1+1bPiRCvaazjFsDu4Hy3G5+y2LSvUGHPalkw0OFuxiPkDaDmviBHoS3y39F8/6qTnOEdeTfsfUuajSp1J6Kpsnv/HT5m7oiKsmEREAREQBERAEREAREQBERAEREAREQBERAEREBrXUbSVHWOl7eJtRQCd8ThWsSxB5geR2cN1zJEyWlrqXRl+1kchqqtZENXIiQwwOaAHBj2f6m/q+Y+67APkq66zaQuZ/EMnwNWAZJsoMrwA2SSPYjjy++xV3tsqFvOOG9HhLR5JW1pCvd0uaSjqstrKx4op7MQCfPOiyQldqis5ja1apsKj3NIc3k0di7bf6E7L2vywXYjdzM4q6xqOb8NQEYb4rGlpbyaBsHdz29Vq9jP1mYs0dPQ25NZUrLjNaYC8mNvIOEfuW9u/tusvHsr5CuzWOXyzhrKnK2Z9CQbOmDHNDHuB8jsO4+iz0+EVqlo63EJtRjF4itWuqbR1rjj1vQ4grfhNOLnOS5pvRPXDSef8AV9iYjYLZn1lkbcEOTgeHPxBZwNtoDRuG+jT33H0OyzMNBWyWNn1Q6SjHDzeyrgZu0T5dgPk3PkOW/wB+yxmYyTXluxrGXI1qGRplviVwAPiTGzdvhjfzOwBC9a9/D6sNrM52xXwkuJrgwtjbtFI4lxYNvfl57eYV/wCsYsqNvbTc6s1jO2F1+fbqYH6N83Erm8vaSp0KUstJ5Te66rR7Poe+bwOrbl+DEfgVB+TyEbXTTxRgCtGPlawkfp2De/32V7aI0nh9KY91bF1RE6Xi6d3IkvcB57lan0N0jaw1KxqDJ5RuRu5ZjXiRjy5oj8xsT5k77qzFdWcaEFbUnmK3f/T6tnNhKd3Wd3WWJPZdIx6JdkERFkNIREQBERAEREAREQBERAEREAREQBERAEREAREQBERAcu9XtMQ9HtSVdb6bsOktX7czYYZ2B0dfk0l23vvuQN1A4TB5LKSRdYbD6/wPx5ntVu/J0ok2LB+1x/sCupNZaVwer8T+F5+k21WDxI0E7Frh6g+i5BiyGVxnVGXRL5bFbDHKGg7Hh3yNhdJsCAfXbZ2/8rvUK9a5tZxpP/Kk9X1XRHIdC3oXdOVwm6XMspfFZZvuVp3Nf3Rl9K41tV9VjI7FRjg3wjuSJG/Q99/soXN26XUX8P05pbGx08zA9zpy9wa264NAc8EeRGxO3sSvXqTkMh0uy1OvovOGSvfh8aW00teJHMeR4fbt2HmP3LcegfTqpfv4nqY286JsrZJBRazYMlPJjtj/AE78iB9lyuC8MXD6Tvrj9yW3ZPXp4nc9J+NfqlRcOtP2Y79G08PfwexcugsNJp7R2Jwssgkkp1mRPcPVwHf+N1OIiolJzk5PdlEIKEVFbIIiKJIIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCqzr9o7GW9FZ3UmPw8D9QwU947TGfmhoI5bbevDkrTUfnMrj8XW55CQNjfu3Yjfl7hW0asqU1NdCurTVSLizjb/DphaetNWT6ZzVeS3jHVHzkhxBryAtAcD6b7kfX+F2Tp3D4/AYSrh8XAIKdVgZEweg/+rUdM5Dp7hLU8mEo1cfLaI8V8UPEv7+q3yN7ZI2yMO7XDcH6LVf3ruqmVpHsZ7O0VvHD37n6REWA2BERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBeFypWuR+HZhZK32cN17ogIyLT+HifzZj4A7/apJoDQABsB5BfUQBERAEREAREQBERAEREAREQBERAEREAREQA+S5061ajzmn9U69pV8lajFzBU58e1rz+VIZ2xO4exO5XRaoH/ABD4WS71h6eub/lZGcU7A27ObHKyXY/8n+Fv4c4+uxLbH218jJe59X7v5nTzMPTXUsYjOZHUmYuXbePqYHFVYasZ5Ga1NHzOw/q7Hutqs9fdJjF42dtTImbJeJGyER/PFKx4YWO9j8wP2VMaQqHCaaxuqcu1z8fQ1uyK44t3DIoYvDaSPZp3U300dSzPXKLMQ12vxl+3mLVHmz5XNDWAPA++66dS0oNuTWi8lt5mGFxVSST38+vkSMnVmLC9CKmIu3chY1Bk8fbfHZYS50P5sjWOc707jYfZb/o7rBgnYTBUbsd342ay3FPc8DfxmQse55/aeQ7/AFXPeNyWOwuk8n+MxF34xpSSvjHFnIGUWpNwD6EHv/C/Ws6V2jn8jaq7hmMxdLORbf1yR1oyf+6slY0anutYy28/x9skI3VSGqfRFyYbq3ga2b1PrOxZyr6UtSh8Pjnx/pc/m1vD3LuJJ+yx9H9asXicRmszkW5O+MlnrBoVGs5SxQNYxx3HoG7qusnUi01q2lNdjJx2Gdp+S+OO4a3wHbkj/cVGXb1G5ra3qOtmpcDg7eQyTa9xkPIAkMdw4+nNpUY2VGaejw0votiTuakXvr+anQXVPVHx+nNCZrT9+WOpk9QUhyjdxL4n8t2u/wDY+i2Lqn1Iw3T6Ck7I17Vue453hQVm8n8Wjdzz9Buqe1DLR070G6bXJZbJoVM9Xsl80fGTwuUr9+P28k1d1N0fl+omJ1g2SaXBw4m7jXSSwbBtktDwNvq0gLHG0U+VKLcU5fPGyNDuXHLzhvBv+quvOjcC+iDHdust0WXedePkI2P/AEh3sSojH9VcPpdmdu2X5bLSXs5N4FVke74WNhje4N/Y0EHf6qiaFuDS2hdSYnUdOb43PYKm/FF0W+zQ4nz9Nhsf4UpqD4MOmc/KTYa6zL23VshtvCP+mg5RP277uHYfda1w6jH3cPHfvs/6M7vKj1/Eb1rHquzUOXzNOnk8rTxD4cbPSmgh/Q4yjn39ncmj+HKxJOuOjYNT5HBTm2wUGTcrZZ+VI+Ju72NPqexVDXMsybT8rb0MVS7fxWEliiZHwDmssuDnAenm0/ypCDOaXraIyWjc1gLGSzcN/KSWHQtAmqM3J8YE+fbb+y8nZU5JLlenb4LU9hczTbz+di+dIdVMTqrA5q7j6VurbxcYc+raZxeebd4z9nKTp47KYKxXycuTuXoZWOORjldu1nyl3Ng9NiNtvYqmegT7lyprLFVshFnYoaVaStebHs9x2LhCSfMjYDb0Vl62v4q2ylfoXZZLdpjg+OOY8WRiF+/JvkO+w7+q+c4pTjb12lssY1PpOEuVeil3bT07LT4ddfA2Nmt8NI5hibbfE4jlMITwY0nYPJ/pJ8j9FI2dQ4yvjTkJZiK4kkjLuP8AqZy5f+DlrM1mhSweWpzujZJNjYRBEexkBi4Na0evzA+XuoPLWoIdCjGSytdcjt3PEi33cNmTE7j7Ef3WL2iUVq1sbfYqc2uWLWuPljP0LBweoaWXnkggZYje1gkYJmcfEjJ2D2+4UwtUxlynkNSYuTHyxytixjzLwO/EOczi0+x+V3b6La1ppSclq8nPuaahLCWPBhERWmcIiIAiIgCIiAIiIAvCzTqWZoJ7FaKWWu4uhe9oJjJGxIPovdEzgGBLhsTLjpsdJjqrqk7i6WExjg9xO5JHvuvlPC4mmK4qY2rD8MwxwcIwPDafMD2BUgilzS7nnKiJn03gJ4q8U2GoyMrchC10DSI+X6th6br3lwuIl5+Jjaj/ABImwv3iB5RjuGn6DYdlnonNLuOVdiPt4TEW2WW2cbVmFpjWTh8QPiNb+kH329Fjz6Y07PQFCXCUH1RIJBEYG8eW22+3vsFMIinJdRyrsYd3FY27Tjp26FaevHsWRSRgtbsNhsPTssKXS2nJaXwUmDoOr+IJfD8BvHmO3Lb3UyiKclsxyp9ClesPTnW2qNQS18PfxzdP3q0VeWOxGOdRrSOXhdtxuB6Kz36V0/NjI8faxFOxCwtcWyRA8ngAcj9dgO6m0Vs7icoxj2K40Yxk5dyNnwGEnfG+bE05HRxiJhdCDxYDuGj6AhfG4HCtyFjIDFVBbssLJpvCHKRp8wT6qTRVc0u5ZyrsR+FwuKwsL4cTjq1KOR3J7YYw3kfcr0ixWNifI+OjXa6U7vIjHzH6rMRRl7zyyUW4rEdDGmx9GeWGWapC+SH/ACnOYCWfZYGdwda9j77IK8DLlqF0fjFg33I2BJUwii4Raw0ThVnBpp7GJjqFWkw/D1ooXv28QsaByPuVloi9SSWEQlJyeWERF6eBERAf/9k=';
+  try{ doc.addImage(LOGO_DATA, 'JPEG', LM, y, 28, 22); }catch(e){
+    t('Worldwide', LM+8, y+8, 7, true, BLUE, 'center');
+    t('Logistics', LM+8, y+13, 7, false, BLUE, 'center');
+    t('Group', LM+8, y+18, 6, false, BLUE, 'center');
+  }
+
+  // Company info — identical block to Sea Freight Pro
+  const co = [
+    ['Worldwide Logistics Services (Thailand) Co.,Ltd.', 9, true],
+    ['191 SILOM COMPLEX BUILDING, 16TH FLOOR, UNIT 4, SILOM ROAD,', 7.5, false],
+    ['KWAENG SILOM, KHET BANGRAK, BANGKOK 10500 THAILAND', 7.5, false],
+    ['Tel no. 02-0042071  Tax ID 0105561014225 (Head Quarter)', 7.5, false],
+  ];
+  let coY = y + 5;
+  co.forEach(([txt,sz,bold])=>{ t(txt, LM+TW/2, coY, sz, bold, BLK, 'center'); coY+=5; });
+
+  // Revised banner — pinned to the very top-right corner so it never collides
+  // with the header/company info block below it
+  if(isRevised){
+    doc.setDrawColor(...RED); doc.setLineWidth(0.6);
+    doc.rect(RM-34, 4, 34, 7, 'S');
+    t('REVISED #'+revCount, RM-34+17, 8.7, 8.5, true, RED, 'center');
+  }
+
+  y += HEADER_H;
+
+  // Booking Confirmation bar
+  const BAR_H=7;
+  rect(LM, y, TW, BAR_H, LGRAY);
+  t('Booking Confirmation', LM+TW/2, y+4.5, 10, true, BLK, 'center');
+  y += BAR_H;
+
+  // Shipper / Booking No
+  const SEC_H=28;
+  rect(LM, y, TW, SEC_H, null, true, 0.3);
+  const MID = LM+TW*0.52;
+  revHighlight('shipper', LM+38, y+3.5, 60, 5);
+  t('Shipper Name :', LM+3, y+7, 8, true);
+  t(gv(s,'shipper'), LM+40, y+7, 8);
+  if(gv(s,'shipperRef')){ revHighlight('shipperRef', LM+38, y+9.5, 60, 5); t(gv(s,'shipperRef'), LM+40, y+13, 7.5); }
+  t('Booking No.', MID+4, y+5, 8, true);
+  revHighlight('bkgno', MID+TW*0.3, y+9, TW*0.18, 5.5);
+  t(gv(s,'bkgno'), RM-4, y+13, 14, true, BLK, 'right');
+  t('Shipping Line :', MID+4, y+18, 8, true);
+  revHighlight('carrier', MID+TW*0.2, y+21.5, TW*0.28, 6);
+  t(gv(s,'carrier'), RM-4, y+26, 17, true, BLK, 'right');
+  y += SEC_H;
+
+  // Schedule section
+  const SH=5.5, RH=5.5;
+  const schedTop=y;
+  rect(LM, y, TW*0.52, SH, LBLUE, false);
+  hline(y);
+  t('Schedule Informtion', LM+3, y+3.8, 8, true);
+  y += SH;
+  const C1=LM+3, C2=LM+35, C3=LM+100, C4=LM+128;
+
+  const srows=[
+    ['VSL Name / Voy :', gv(s,'vsl'), DKBLUE, true, 'vsl', 'MOTHER VSL Name :', gv(s,'motherVsl'), BLUE, true, 'motherVsl'],
+    ['ETD :', gv(s,'etd'), BLUE, true, 'etd', 'ETA :', gv(s,'eta'), BLUE, true, 'eta'],
+    ['Port of Receive :', gv(s,'portReceive'), BLK, false, 'portReceive', 'Port of Discharge :', gv(s,'portDischarge'), BLK, false, 'portDischarge'],
+    ['Port of Loading :', gv(s,'portLoading'), BLK, false, 'portLoading', 'Final Destination :', gv(s,'finalDest'), BLK, false, 'finalDest'],
+    ['Port of Transit :', gv(s,'portTransit'), BLK, false, 'portTransit', '', '', BLK, false, '__none'],
+    ['Volume :', gv(s,'volume'), BLK, true, 'volume', '', '', BLK, false, '__none'],
+    ['SI Cut-Off time :', gv(s,'siCutoff'), BLK, true, 'siCutoff', 'Dead Line CFM BL :', gv(s,'cfmBl'), BLK, true, 'cfmBl'],
+    ['VGM Cut-Off time :', gv(s,'vgmCutoff'), BLK, true, 'vgmCutoff', 'Gate Closing Date :', gv(s,'gateClosing'), RED, true, 'gateClosing'],
+  ];
+  srows.forEach(([l1,v1,c1,b1,k1,l2,v2,c2_,b2,k2])=>{
+    revHighlight(k1, C2-1, y+0.7, 60, 4.3);
+    t(l1,C1,y+RH-1.5,8,true); t(v1,C2,y+RH-1.5,8,b1,c1);
+    if(l2){ revHighlight(k2, C4-1, y+0.7, 60, 4.3); t(l2,C3,y+RH-1.5,8,true); t(v2,C4,y+RH-1.5,8,b2,c2_); }
+    y+=RH;
+  });
+  rect(LM, schedTop, TW, y-schedTop, null, true, 0.3);
+  y+=2;
+
+  // Conveyance section
+  const convTop=y;
+  rect(LM, y, TW*0.52, SH, LBLUE, false);
+  hline(y);
+  t('Conveyance & Cargo Information', LM+3, y+3.8, 8, true);
+  y+=SH;
+
+  revHighlight('paperless', C2-1, y+0.7, 50, 4.3);
+  t('Paperless Code :', C1, y+RH-1.5, 8, true);
+  t(gv(s,'paperless'), C2, y+RH-1.5, 8, true, RED);
+  y+=RH+2;
+
+  // Pickup
+  const puTerminalText = terminalText(d.puTerminalId, d.puTerminalFree);
+  const puTerminalRevised = isRev('puTerminalId')||isRev('puTerminalFree');
+  const puRows=[
+    ['Pick up Ref :', gv(s,'puRef'), true, 'puRef'],
+    ['Pick up Date :', gv(s,'puDate'), false, 'puDate'],
+    ['Pick up Place :', puTerminalText, false, puTerminalRevised?'puTerminalId':'__none'],
+    ['Pick up PIC.:', gv(s,'puPic'), false, 'puPic'],
+  ];
+  puRows.forEach(([lbl,val,bv,key])=>{
+    const lines = wrapLines(val, TW-40, 8);
+    const rh2 = Math.max(RH, lines.length*4.5);
+    revHighlight(key, C2-1, y+0.5, TW-45, rh2-1);
+    const vy = y+rh2/2-1;
+    t(lbl, C1, vy, 8, true);
+    lines.forEach((ln,i)=>{ doc.setFont('helvetica',bv?'bold':'normal'); doc.setFontSize(8); doc.setTextColor(...BLK); doc.text(ln,C2,y+4+i*4.5); });
+    y+=rh2;
+  });
+  y+=1;
+
+  // Turn-in
+  const tiTerminalText = terminalText(d.tiTerminalId, d.tiTerminalFree);
+  const tiTerminalRevised = isRev('tiTerminalId')||isRev('tiTerminalFree');
+  const tiRows=[
+    ['Turn-In Ref :', gv(s,'tiRef'), true, 'tiRef'],
+    ['Turn-In Date :', gv(s,'tiDate'), false, 'tiDate'],
+    ['Turn-In At :', tiTerminalText, false, tiTerminalRevised?'tiTerminalId':'__none'],
+    ['', '', false, '__none'],
+    ['Turn-In PIC.:', gv(s,'tiPic'), false, 'tiPic'],
+    ['', '', false, '__none'],
+  ];
+  tiRows.forEach(([lbl,val,bv,key])=>{
+    if(lbl){ revHighlight(key, C2-1, y+0.2, TW-45, RH-0.8); t(lbl,C1,y+RH-1.5,8,true); t(val,C2,y+RH-1.5,8,bv); }
+    y+=RH;
+  });
+  y+=1;
+
+  // Commodity
+  revHighlight('commodity', C2-1, y+0.2, 50, RH-0.8);
+  revHighlight('weight', LM+143-1, y+0.2, 30, RH-0.8);
+  t('Commodity :',C1,y+RH-1.5,8,true); t(gv(s,'commodity'),C2,y+RH-1.5,8);
+  t('Weight:',LM+128,y+RH-1.5,8,true); t(gv(s,'weight'),LM+143,y+RH-1.5,8);
+  y+=RH;
+  revHighlight('hsCode', C2-1, y+0.2, 50, RH-0.8);
+  t('HS. Code :',C1,y+RH-1.5,8,true); t(gv(s,'hsCode')||'Please advise',C2,y+RH-1.5,8);
+  y+=RH;
+  rect(LM, convTop, TW, y-convTop, null, true, 0.3);
+  y+=2;
+
+  // Special Cargo Remark
+  const srTop=y;
+  hline(y);
+  t('Special Cargo Remark', LM+3, y+3.8, 8, true);
+  y+=SH;
+  const srText = gv(s,'specialRemark');
+  const srLines = wrapLines(srText, TW-6, 7.5);
+  const srH = Math.max(14, srLines.length*4.5+8);
+  doc.setFillColor(...(isRev('specialRemark') ? REVYELLOW : YELLOW));
+  doc.rect(LM, y, TW, srH, 'F');
+  if(isRev('specialRemark')){ doc.setDrawColor(...RED); doc.setLineWidth(0.3); doc.rect(LM, y, TW, srH, 'S'); }
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...RED);
+  srLines.forEach((ln,i)=>doc.text(ln, C1, y+4+i*4.5));
+  y+=srH;
+  rect(LM, srTop, TW, y-srTop, null, true, 0.3);
+  y+=2;
+
+  // Remarks
+  const remarks=[
+    "A): Customer can revise volume / postpone shipment more than twice times, there will be amendment charge USD50",
+    "B). THB 1500 per TEU for failure to cancel booking 7 days before CY date at loading port.",
+    "C).USD100/set for failure to submit shipping particular 3 days prior SI cut off time. The container will be shut out (for those booking which is missing S/I)",
+    "D). USD 100/Set for failure to submit shipping particular 4 days (shipment involved with ENS /AMS /AFR submission) prior feeder cut off at loading port.",
+    "E). Customer has to confirm Bill of Lading as per Deadline CFM BL and if have any amendment after deadline there will be amendment charge incur @ THB1500 per set but for Europe, USA, CA and CN that has to submit Manifest have, there will be amendment charge incur @ THB1500 per set and manifest amendment USD50",
+    "F): If customer request to Re-issue/Re Print Bill of Lading, there is Re-Print fee @ THB1700",
+    "G). Customer should pick up B/L within 7 days after vessel departure otherwise there is Late pick up B/L fee THB1500",
+  ];
+  let allLines=[];
+  remarks.forEach(r=>{ allLines.push(...wrapLines(r,TW-6,7)); });
+  const remH = allLines.length*3.8+12;
+  doc.setDrawColor(...BLK); doc.setLineWidth(0.3);
+  doc.rect(LM, y, TW, remH, 'S');
+  t('Remark:-', C1, y+5, 8, true);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...BLK);
+  let ry=y+9;
+  remarks.forEach(r=>{
+    const lines=wrapLines(r,TW-6,7);
+    lines.forEach(ln=>{ doc.text(ln,C1,ry); ry+=3.8; });
+  });
+
+  // Download
+  const fileSafeBooking = (gv(s,'bkgno')||'DRAFT').toUpperCase().replace(/[^A-Z0-9_-]/gi,'');
+  const fname = isRevised
+    ? `Revised_${revCount}_BOOKINGCONFIRMATION_${fileSafeBooking}.pdf`
+    : `BOOKINGCONFIRMATION_${fileSafeBooking}.pdf`;
+  doc.save(fname);
+  toast('📥 Downloaded: '+fname);
+  // Exporting the Booking Confirmation moves a fresh shipment from In Process -> Confirmed
+  if(s.status === 'In Process'){
+    s.status = 'Confirmed';
+    if(!s.statusHistory) s.statusHistory = [];
+    s.statusHistory.push({status:'Confirmed', date:new Date().toISOString(), note:'Auto: Booking PDF exported'});
+    syncAutoStatus(s); // if ETD already reached, advance straight to LOAD
+    saveShipments();
+  }
+  closeModal('bpdf_modal'); g('bpdf_modal')?.remove();
+  rerenderGrid();
+};
+
+// ═══════════════════════════════════════════════════════
+// CUT-OFF TRACKING — overview across all shipments
+// ═══════════════════════════════════════════════════════
+const CUTOFF_DEFS = [
+  {key:'si',  label:'SI Cut-off',       who:'Ours'},
+  {key:'vgm', label:'VGM Cut-off',      who:'Ours'},
+  {key:'bl',  label:'BL Confirm (CFM)', who:'Ours'},
+  {key:'cy',  label:'CY Cut-off',       who:'Carrier'},
+  {key:'rtn', label:'RTN',              who:'Carrier'},
+];
+
+function cutoffUrgency(dtStr){
+  if(!dtStr) return {label:'—', cls:'badge-gray', hoursLeft:Infinity};
+  const dt = parseFlexibleDate(dtStr);
+  if(!dt) return {label:'⚠ Unreadable date', cls:'badge-amber', hoursLeft:Infinity};
+  const hrs = (dt - new Date()) / 3600000;
+  if(hrs < 0) return {label:'Overdue', cls:'badge-red', hoursLeft:hrs};
+  if(hrs <= 24) return {label:'< 24h', cls:'badge-red', hoursLeft:hrs};
+  if(hrs <= 72) return {label:'< 3 days', cls:'badge-amber', hoursLeft:hrs};
+  return {label:'On track', cls:'badge-green', hoursLeft:hrs};
+}
+
+function render_tracking(){
+  g('topbar_actions').innerHTML = '';
+
+  // Build a flat list of {shipment, cutoffKey, label, who, value, urgency}
+  const rows = [];
+  shipments.forEach((s,idx)=>{
+    if(s.status==='Completed' || s.status==='Cancelled') return;
+    CUTOFF_DEFS.forEach(def=>{
+      const val = s[def.key];
+      if(!val) return;
+      rows.push({ idx, s, def, value: val, urgency: cutoffUrgency(val) });
+    });
+  });
+  rows.sort((a,b)=> a.urgency.hoursLeft - b.urgency.hoursLeft);
+
+  g('page-tracking').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
+      <div class="card card-pad">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Overdue / &lt; 24h</div>
+        <div style="font-family:var(--disp);font-size:26px;font-weight:700;color:var(--red);margin-top:4px">${rows.filter(r=>r.urgency.hoursLeft<=24).length}</div>
+      </div>
+      <div class="card card-pad">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Due within 3 days</div>
+        <div style="font-family:var(--disp);font-size:26px;font-weight:700;color:var(--amber);margin-top:4px">${rows.filter(r=>r.urgency.hoursLeft>24 && r.urgency.hoursLeft<=72).length}</div>
+      </div>
+      <div class="card card-pad">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Total tracked cut-offs</div>
+        <div style="font-family:var(--disp);font-size:26px;font-weight:700;margin-top:4px">${rows.length}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Status</th><th>Booking No.</th><th>Customer</th><th>Cut-off Type</th><th>Owner</th><th>Date/Time</th><th style="width:90px"></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>`
+              <tr>
+                <td><span class="badge ${r.urgency.cls}">${r.urgency.label}</span></td>
+                <td style="font-family:var(--mono);font-weight:700;color:var(--teal-dk)">${escapeHtml(r.s.bookingNo||'—')}</td>
+                <td>${escapeHtml(r.s.customer||'—')}</td>
+                <td>${r.def.label}</td>
+                <td><span class="badge ${r.def.who==='Ours'?'badge-teal':'badge-amber'}">${r.def.who}</span></td>
+                <td style="font-family:var(--mono);font-size:11.5px">${fmtDateTime(r.value)}</td>
+                <td><button class="btn btn-sm btn-ghost" onclick="openBookingPdfModal(${r.idx})">Open</button></td>
+              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">⏱</div>No cut-off times recorded yet. Set them inside each shipment's Booking PDF.</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+// CHECKLISTS — per-shipment task list, based on a reusable template
+// ═══════════════════════════════════════════════════════
+let _checklistSearchQuery = '';
+
+function render_checklist(){
+  g('topbar_actions').innerHTML = `<button class="btn btn-ghost" onclick="openChecklistTemplateModal()">⚙ Edit Template</button>`;
+
+  // Same fix as render_shipments: innerHTML replacement destroys/recreates the
+  // search input, which steals focus mid-typing — preserve and restore it.
+  const prevSearchEl = g('checklist_search');
+  const hadFocus = prevSearchEl && document.activeElement === prevSearchEl;
+  const cursorPos = hadFocus ? prevSearchEl.selectionStart : null;
+
+  const q = (_checklistSearchQuery||'').toLowerCase();
+  const activeShipments = shipments.filter(s=>{
+    if(s.status==='Cancelled') return false;
+    if(q && !((s.bookingNo||'')+' '+(s.customer||'')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  g('page-checklist').innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-pad">
+        <input id="checklist_search" class="inp" placeholder="🔍 Search Booking No. / Customer…" style="max-width:340px" value="${escapeHtml(_checklistSearchQuery||'')}" oninput="_checklistSearchQuery=this.value;render_checklist()">
+      </div>
+    </div>
+    <div class="card">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Booking No.</th><th>Customer</th><th>Status</th><th>Progress</th><th style="width:90px"></th></tr></thead>
+          <tbody>
+            ${activeShipments.length ? activeShipments.map(s=>{
+              const idx = shipments.indexOf(s);
+              const items = getEffectiveChecklistItems(s);
+              const checked = s.checklist || {};
+              const total = items.length;
+              const done = items.filter(item=>checked[item]).length;
+              const pct = total ? Math.round(done/total*100) : 0;
+              return `<tr>
+                <td style="font-family:var(--mono);font-weight:700;color:var(--teal-dk)">${escapeHtml(s.bookingNo||'—')}${isUsaBoundShipment(s)?' <span title="USA-bound — AMS/ISF required">🇺🇸</span>':''}</td>
+                <td>${escapeHtml(s.customer||'—')}</td>
+                <td><span class="badge ${STATUS_COLOR[s.status]||'badge-gray'}">${s.status}</span></td>
+                <td style="min-width:160px">
+                  <div style="font-size:11px;font-family:var(--mono);margin-bottom:3px">${done}/${total} done</div>
+                  <div style="background:var(--line);border-radius:4px;height:6px;overflow:hidden">
+                    <div style="background:${pct===100?'var(--green)':'var(--teal)'};height:100%;width:${pct}%"></div>
+                  </div>
+                </td>
+                <td><button class="btn btn-sm btn-ghost" onclick="openShipmentChecklist(${idx})">Open</button></td>
+              </tr>`;
+            }).join('') : `<tr><td colspan="5"><div class="empty-state"><div class="ic">✅</div>${q ? 'No shipments match your search' : 'No active shipments to check off yet'}</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  if(hadFocus){
+    const newSearchEl = g('checklist_search');
+    if(newSearchEl){
+      newSearchEl.focus();
+      newSearchEl.setSelectionRange(cursorPos, cursorPos);
+    }
+  }
+}
+
+// Determines the destination country from POD / FPOD (and any legacy fields)
+// so the checklist can require AMS/ISF for the USA and the Shipments page can
+// flag ACI for Canada. Detection order matters: Canada is checked first via
+// the word "Canada", Canadian city names, or a Canadian province code after a
+// comma ("TORONTO, ON"). California's "CA" is NOT a Canadian province, so a US
+// destination like "LOS ANGELES, CA" correctly resolves to the USA — fixing the
+// old false-positive where bare "CA" was treated as Canada.
+const US_STATES = new Set('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(' '));
+const CA_PROVS  = new Set('ON QC BC AB MB SK NS NB NL PE NT YT NU'.split(' '));
+const CA_CITY_RE = /\b(canada|toronto|montreal|montr[eé]al|vancouver|calgary|edmonton|winnipeg|ottawa|halifax|quebec|qu[eé]bec)\b/i;
+const US_NAME_RE = /\b(united states|u\.?s\.?a\.?)\b/i;
+
+function destCountry(s){
+  const fields = [s.pod, s.fpod, s.del, (s.bpdfData||{}).finalDest, (s.bpdfData||{}).portDischarge].filter(Boolean);
+  // Canada first
+  for(const f of fields){
+    if(CA_CITY_RE.test(f)) return 'CA';
+    const m = f.toUpperCase().match(/,\s*([A-Z]{2})\b/);
+    if(m && CA_PROVS.has(m[1])) return 'CA';
+  }
+  // then USA
+  for(const f of fields){
+    if(US_NAME_RE.test(f)) return 'US';
+    const m = f.toUpperCase().match(/,\s*([A-Z]{2})\b/);
+    if(m && US_STATES.has(m[1])) return 'US';
+  }
+  return null;
+}
+
+function isUsaBoundShipment(s){ return destCountry(s) === 'US'; }
+function isCanadaBoundShipment(s){ return destCountry(s) === 'CA'; }
+
+// Builds the checklist item list that actually applies to this shipment:
+// the base template, with "AMS/ISF Submitted" inserted right after
+// "Draft B/L checked" when the shipment is USA-bound. Checked-state is keyed
+// by item text (not array index) so inserting this conditional item never
+// shifts/misaligns existing checkmarks on other items.
+function getEffectiveChecklistItems(s){
+  const base = checklistTemplates[0].items;
+  if(!isUsaBoundShipment(s)) return base.slice();
+  const draftBlIdx = base.findIndex(i => i.toLowerCase().includes('draft b/l'));
+  const items = base.slice();
+  const amsItem = 'AMS/ISF Submitted';
+  if(!items.includes(amsItem)){
+    if(draftBlIdx >= 0) items.splice(draftBlIdx+1, 0, amsItem);
+    else items.push(amsItem); // fallback if the template no longer has a Draft B/L line
+  }
+  return items;
+}
+
+window.openShipmentChecklist = function(idx){
+  g('checklist_modal')?.remove();
+  const s = shipments[idx]; if(!s) return;
+  if(!s.checklist) s.checklist = {};
+  const items = getEffectiveChecklistItems(s);
+  const isUsa = isUsaBoundShipment(s);
+
+  const body = `
+    <div class="modal-overlay open" id="checklist_modal" style="z-index:950">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-head"><h2>✅ ${escapeHtml(s.bookingNo||'')}</h2><button class="btn-icon" onclick="closeModal('checklist_modal');g('checklist_modal').remove()">✕</button></div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:8px">
+          ${isUsa ? `<div style="font-size:11px;color:var(--slate);background:var(--amber-bg);padding:8px 10px;border-radius:7px;margin-bottom:2px">🇺🇸 USA-bound shipment — AMS/ISF filing required</div>` : ''}
+          ${items.map((item)=>`
+            <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;background:${s.checklist[item]?'var(--green-bg)':'var(--card2)'};cursor:pointer">
+              <input type="checkbox" ${s.checklist[item]?'checked':''} onchange="toggleChecklistItem(${idx},'${item.replace(/'/g,"\\'")}',this.checked)" style="width:16px;height:16px;accent-color:var(--teal)">
+              <span style="font-size:13px;${s.checklist[item]?'text-decoration:line-through;color:var(--muted)':''}">${escapeHtml(item)}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-primary" onclick="closeModal('checklist_modal');g('checklist_modal').remove();render_checklist()">Done</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', body);
+};
+
+window.toggleChecklistItem = function(shipIdx, itemKey, checked){
+  const s = shipments[shipIdx]; if(!s) return;
+  if(!s.checklist) s.checklist = {};
+  s.checklist[itemKey] = checked;
+  saveShipments();
+  // Refresh the open modal's row styling without a full re-render
+  const modal = g('checklist_modal');
+  if(modal){
+    const items = getEffectiveChecklistItems(s);
+    const labels = modal.querySelectorAll('.modal-body label');
+    const itemIdx = items.indexOf(itemKey);
+    const label = labels[itemIdx];
+    if(label){
+      label.style.background = checked ? 'var(--green-bg)' : 'var(--card2)';
+      const span = label.querySelector('span');
+      span.style.textDecoration = checked ? 'line-through' : 'none';
+      span.style.color = checked ? 'var(--muted)' : '';
+    }
+  }
+  // Refresh the active grid (Shipments or Documents) so the ❗ cut-off warnings,
+  // AMS/ISF alert, and Completed gating update immediately as tasks are ticked.
+  rerenderGrid();
+};
+
+window.openChecklistTemplateModal = function(){
+  g('tmpl_modal')?.remove();
+  const template = checklistTemplates[0];
+  const body = `
+    <div class="modal-overlay open" id="tmpl_modal" style="z-index:950">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-head"><h2>⚙ Checklist Template</h2><button class="btn-icon" onclick="closeModal('tmpl_modal');g('tmpl_modal').remove()">✕</button></div>
+        <div class="modal-body">
+          <div class="inp-group">
+            <label class="inp-lbl">One item per line</label>
+            <textarea id="tmpl_items" class="inp" rows="12" style="font-family:var(--mono);font-size:12px">${template.items.join('\n')}</textarea>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">⚠ Changing the template does not affect checkmarks already saved on existing shipments by position — reordering lines will shift which checkbox each line maps to.</div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="closeModal('tmpl_modal');g('tmpl_modal').remove()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveChecklistTemplate()">💾 Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', body);
+};
+
+window.saveChecklistTemplate = function(){
+  const lines = g('tmpl_items').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){ toast('กรุณากรอกอย่างน้อย 1 รายการ'); return; }
+  checklistTemplates[0].items = lines;
+  saveChecklistTemplates();
+  g('tmpl_modal').remove();
+  render_checklist();
+  toast('💾 Template updated');
+};
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD — top-level overview
+// ═══════════════════════════════════════════════════════
+function render_dashboard(){
+  g('topbar_actions').innerHTML = `<button class="btn btn-primary" onclick="goPage('shipments')">📦 ไปหน้า Shipments</button>`;
+
+  const active = shipments.filter(s=>s.status!=='Completed' && s.status!=='Cancelled');
+  const byStatus = {};
+  SHIP_STATUSES.forEach(st=>byStatus[st]=0);
+  shipments.forEach(s=>{ byStatus[s.status] = (byStatus[s.status]||0)+1; });
+
+  // Urgent cutoffs (next 72h)
+  const urgentRows = [];
+  active.forEach((s,i)=>{
+    CUTOFF_DEFS.forEach(def=>{
+      const val = s[def.key]; if(!val) return;
+      const u = cutoffUrgency(val);
+      if(u.hoursLeft <= 72) urgentRows.push({s, def, value:val, urgency:u, idx:shipments.indexOf(s)});
+    });
+  });
+  urgentRows.sort((a,b)=>a.urgency.hoursLeft-b.urgency.hoursLeft);
+
+  g('page-dashboard').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px">
+      ${SHIP_STATUSES.map(st=>`
+        <div class="card card-pad">
+          <div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px">${st}</div>
+          <div style="font-family:var(--disp);font-size:24px;font-weight:700;margin-top:5px">${byStatus[st]||0}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-pad" style="border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+          <h3 style="font-family:var(--disp);font-size:14px;font-weight:700">⏱ Urgent Cut-offs (next 72h)</h3>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Status</th><th>Booking</th><th>Type</th><th>Time</th><th></th></tr></thead>
+            <tbody>
+              ${urgentRows.length ? urgentRows.slice(0,8).map(r=>`
+                <tr>
+                  <td><span class="badge ${r.urgency.cls}">${r.urgency.label}</span></td>
+                  <td style="font-family:var(--mono);font-weight:700;color:var(--teal-dk)">${escapeHtml(r.s.bookingNo||'—')}</td>
+                  <td style="font-size:11.5px">${r.def.label}</td>
+                  <td style="font-family:var(--mono);font-size:11px">${fmtDateTime(r.value)}</td>
+                  <td><button class="btn-icon" onclick="openBookingPdfModal(${r.idx})" title="Open">📄</button></td>
+                </tr>`).join('') : `<tr><td colspan="5"><div class="empty-state" style="padding:28px"><div class="ic">✅</div>Nothing urgent right now</div></td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-pad" style="border-bottom:1px solid var(--line)">
+          <h3 style="font-family:var(--disp);font-size:14px;font-weight:700">📦 Recent Shipments</h3>
+        </div>
+        <div style="padding:6px 0">
+          ${shipments.slice(0,8).map(s=>{
+            const idx = shipments.indexOf(s);
+            return `<div style="padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);cursor:pointer" onclick="goPage('shipments')">
+              <div style="flex:1">
+                <div style="font-family:var(--mono);font-weight:700;font-size:12px;color:var(--teal-dk)">${escapeHtml(s.bookingNo||'—')}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">${escapeHtml(s.customer||'—')} · ETD ${fmtDate(s.etd)}</div>
+              </div>
+              <span class="badge ${STATUS_COLOR[s.status]||'badge-gray'}">${s.status}</span>
+            </div>`;
+          }).join('') || `<div class="empty-state"><div class="ic">📦</div>No shipments yet</div>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+// BACKUP / RESTORE — full-system export & import of every
+// piece of CS Ops Hub data (localStorage). One JSON file holds
+// all shipments, terminals/depots, checklist templates, saved
+// ports and UI state, so data survives a cache clear or a move
+// to another device. schemaVersion is stamped on the file so
+// future format changes can be migrated rather than rejected.
+// ═══════════════════════════════════════════════════════
+const SCHEMA_VERSION = 1;
+const BACKUP_KEYS = {
+  shipments: LS_SHIPMENTS,
+  terminals: LS_TERMINALS,
+  checklistTemplates: LS_CHECKLISTS,
+  ports: LS_PORTS,
+  collapsedMonths: 'cshub_collapsed_months',
+};
+
+// Holds a parsed + validated import that's waiting for the user to confirm
+// whether to Replace or Merge — nothing is written until they choose.
+let _pendingBackup = null;
+
+function buildBackupObject(){
+  return {
+    app: 'CS Operations Hub',
+    type: 'cshub-backup',
+    schemaVersion: SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    counts: {
+      shipments: shipments.length,
+      terminals: terminals.length,
+      checklistTemplates: checklistTemplates.length,
+      ports: ports.length,
+    },
+    data: {
+      shipments,
+      terminals,
+      checklistTemplates,
+      ports,
+      collapsedMonths: _shipCollapsedMonths,
+    },
+  };
+}
+
+function approxBytes(obj){
+  try{ return new Blob([JSON.stringify(obj)]).size; }catch(e){ return 0; }
+}
+function fmtBytes(n){
+  if(n < 1024) return n+' B';
+  if(n < 1024*1024) return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(2)+' MB';
+}
+function fmtBackupDate(iso){
+  const dt = new Date(iso);
+  if(isNaN(dt)) return iso;
+  return dt.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+// Accepts either a full backup wrapper ({type,data,...}) or a bare data
+// object, so hand-made or partial files still work.
+function getBackupData(obj){ return (obj && obj.data) ? obj.data : obj; }
+
+function validateBackup(obj){
+  if(!obj || typeof obj !== 'object') return {ok:false, error:'โครงสร้างไฟล์ไม่ถูกต้อง'};
+  const data = getBackupData(obj);
+  if(!data || typeof data !== 'object') return {ok:false, error:'ไม่พบส่วนข้อมูล (data) ในไฟล์'};
+  const hasAny = ['shipments','terminals','checklistTemplates','ports'].some(k=>Array.isArray(data[k]));
+  if(!hasAny) return {ok:false, error:'ไฟล์นี้ไม่มีข้อมูลของ CS Ops Hub'};
+  let warning = '';
+  if(obj.type && obj.type !== 'cshub-backup') warning = 'ไฟล์อาจไม่ใช่ไฟล์สำรองของ CS Ops Hub โดยตรง';
+  if(obj.schemaVersion && obj.schemaVersion > SCHEMA_VERSION) warning = 'ไฟล์มาจากเวอร์ชันที่ใหม่กว่า — ข้อมูลบางส่วนอาจไม่รองรับ';
+  return {ok:true, warning};
+}
+
+window.exportFullBackup = function(){
+  const obj = buildBackupObject();
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url;
+  a.download = `cshub_backup_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('💾 ดาวน์โหลดไฟล์สำรองแล้ว');
+};
+
+window.triggerBackupImport = function(){ g('backup_file_input')?.click(); };
+
+window.onBackupFileSelected = function(input){
+  const file = input.files && input.files[0];
+  if(!file){ return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    let parsed;
+    try{ parsed = JSON.parse(e.target.result); }
+    catch(err){ toast('❌ ไฟล์ไม่ใช่ JSON ที่อ่านได้'); input.value=''; return; }
+    const v = validateBackup(parsed);
+    if(!v.ok){ toast('❌ '+v.error); input.value=''; return; }
+    _pendingBackup = parsed;
+    if(v.warning) toast('⚠ '+v.warning);
+    render_backup();
+  };
+  reader.onerror = function(){ toast('❌ อ่านไฟล์ไม่สำเร็จ'); };
+  reader.readAsText(file);
+  input.value = ''; // reset so selecting the same file again still fires onchange
+};
+
+// Merge two id-keyed lists: incoming records overwrite existing ones with the
+// same id; records without an id are always kept (given a throwaway key).
+function mergeById(existing, incoming){
+  const map = new Map();
+  (existing||[]).forEach(x=>{ map.set((x && x.id) ? x.id : uid('m'), x); });
+  (incoming||[]).forEach(x=>{ map.set((x && x.id) ? x.id : uid('m'), x); });
+  return Array.from(map.values());
+}
+
+window.applyRestore = function(mode){ // mode: 'replace' | 'merge'
+  if(!_pendingBackup){ toast('ยังไม่ได้เลือกไฟล์'); return; }
+  const data   = getBackupData(_pendingBackup);
+  const inShip = Array.isArray(data.shipments) ? data.shipments : [];
+  const inTerm = Array.isArray(data.terminals) ? data.terminals : [];
+  const inTpl  = Array.isArray(data.checklistTemplates) ? data.checklistTemplates : [];
+  const inPorts= Array.isArray(data.ports) ? data.ports : [];
+
+  if(mode==='replace'){
+    if(!confirm(
+      `แทนที่ข้อมูลทั้งหมดบนเครื่องนี้ด้วยไฟล์สำรอง?\n\n`+
+      `ปัจจุบัน: ${shipments.length} shipment · ${terminals.length} terminal\n`+
+      `ไฟล์:     ${inShip.length} shipment · ${inTerm.length} terminal\n\n`+
+      `ข้อมูลเดิมจะถูกทับและกู้คืนไม่ได้`)) return;
+    shipments = inShip;
+    terminals = inTerm;
+    if(inTpl.length)   checklistTemplates = inTpl;
+    if(inPorts.length) ports = inPorts;
+    if(Array.isArray(data.collapsedMonths)) _shipCollapsedMonths = data.collapsedMonths;
+  } else {
+    if(!confirm(`รวมข้อมูลจากไฟล์เข้ากับข้อมูลเดิม?\n\nรายการที่ id ตรงกันจะถูกอัปเดตด้วยข้อมูลจากไฟล์ รายการใหม่จะถูกเพิ่มเข้ามา`)) return;
+    shipments = mergeById(shipments, inShip);
+    terminals = mergeById(terminals, inTerm);
+    if(inTpl.length) checklistTemplates = mergeById(checklistTemplates, inTpl);
+    inPorts.forEach(p=>{ if(!ports.includes(p)) ports.push(p); });
+  }
+
+  saveShipments(); saveTerminals(); saveChecklistTemplates(); savePorts();
+  localStorage.setItem('cshub_collapsed_months', JSON.stringify(_shipCollapsedMonths));
+  _pendingBackup = null;
+  render_backup();
+  toast(mode==='replace' ? '✅ กู้คืนข้อมูลสำเร็จ' : '✅ รวมข้อมูลสำเร็จ');
+};
+
+window.cancelRestore = function(){ _pendingBackup = null; render_backup(); };
+
+window.clearAllData = function(){
+  if(!confirm('⚠ ล้างข้อมูลทั้งหมดบนเครื่องนี้?\n\nควรกด "ดาวน์โหลดไฟล์สำรอง" ก่อน — ข้อมูลที่ล้างแล้วกู้คืนไม่ได้')) return;
+  if(!confirm('ยืนยันอีกครั้ง — ลบ shipment, terminal, checklist และท่าเรือทั้งหมด?')) return;
+  Object.values(BACKUP_KEYS).forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  shipments=[]; terminals=[]; checklistTemplates=[]; ports=[]; _shipCollapsedMonths=[];
+  loadAll(); // re-seeds default ports & the standard checklist template
+  render_backup();
+  toast('🗑️ ล้างข้อมูลทั้งหมดแล้ว');
+};
+
+function backupStat(label, n){
+  return `<div style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+    <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:600">${label}</div>
+    <div style="font-family:var(--disp);font-size:22px;font-weight:700;margin-top:2px">${n}</div>
+  </div>`;
+}
+
+function render_backup(){
+  g('topbar_actions').innerHTML = '';
+  const sizeData = approxBytes(buildBackupObject().data);
+  const p  = _pendingBackup;
+  const pd = p ? getBackupData(p) : null;
+  const pc = pd ? {
+    shipments:  Array.isArray(pd.shipments) ? pd.shipments.length : 0,
+    terminals:  Array.isArray(pd.terminals) ? pd.terminals.length : 0,
+    templates:  Array.isArray(pd.checklistTemplates) ? pd.checklistTemplates.length : 0,
+    ports:      Array.isArray(pd.ports) ? pd.ports.length : 0,
+  } : null;
+
+  g('page-backup').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+
+      <!-- Export / Backup -->
+      <div class="card">
+        <div class="card-pad" style="border-bottom:1px solid var(--line)">
+          <h3 style="font-family:var(--disp);font-size:15px;font-weight:700">⬇ สำรองข้อมูล (Backup)</h3>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ JSON ไฟล์เดียว เก็บไว้กันข้อมูลหายเวลาเคลียร์แคชหรือย้ายเครื่อง</div>
+        </div>
+        <div class="card-pad">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            ${backupStat('Shipments', shipments.length)}
+            ${backupStat('Terminals / Depots', terminals.length)}
+            ${backupStat('Checklist Templates', checklistTemplates.length)}
+            ${backupStat('Saved Ports', ports.length)}
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px">ขนาดข้อมูลโดยประมาณ: <b>${fmtBytes(sizeData)}</b></div>
+          <button class="btn btn-primary" onclick="exportFullBackup()" style="width:100%">⬇ ดาวน์โหลดไฟล์สำรอง (.json)</button>
+        </div>
+      </div>
+
+      <!-- Import / Restore -->
+      <div class="card">
+        <div class="card-pad" style="border-bottom:1px solid var(--line)">
+          <h3 style="font-family:var(--disp);font-size:15px;font-weight:700">⬆ กู้คืนข้อมูล (Restore)</h3>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">โหลดไฟล์สำรองที่เคยดาวน์โหลดไว้กลับเข้าระบบ</div>
+        </div>
+        <div class="card-pad">
+          ${pc ? `
+            <div style="background:var(--teal-bg);border:1px solid var(--teal);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+              <div style="font-size:12px;font-weight:700;color:var(--teal-dk);margin-bottom:8px">📄 ไฟล์พร้อมกู้คืน${p.exportedAt?` · สำรองเมื่อ ${escapeHtml(fmtBackupDate(p.exportedAt))}`:''}</div>
+              <div style="font-size:12px;color:var(--slate);display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                <span>Shipments: <b>${pc.shipments}</b></span>
+                <span>Terminals: <b>${pc.terminals}</b></span>
+                <span>Templates: <b>${pc.templates}</b></span>
+                <span>Ports: <b>${pc.ports}</b></span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-danger" onclick="applyRestore('replace')" style="flex:1" title="ลบข้อมูลเดิมทั้งหมดแล้วใช้ข้อมูลจากไฟล์">↺ แทนที่ทั้งหมด</button>
+              <button class="btn btn-ghost" onclick="applyRestore('merge')" style="flex:1" title="รวมเข้ากับข้อมูลเดิม รายการ id ซ้ำจะถูกอัปเดต">⛙ รวมกับของเดิม</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="cancelRestore()" style="width:100%;margin-top:8px">ยกเลิก</button>
+          ` : `
+            <button class="btn btn-ghost" onclick="triggerBackupImport()" style="width:100%">📂 เลือกไฟล์สำรอง (.json)</button>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:10px">เลือกไฟล์แล้วระบบจะแสดงจำนวนรายการให้ตรวจก่อน จากนั้นค่อยเลือกว่าจะ <b>แทนที่ทั้งหมด</b> หรือ <b>รวมกับของเดิม</b></div>
+          `}
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="card" style="margin-top:16px;border-color:var(--red)">
+      <div class="card-pad" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <h3 style="font-family:var(--disp);font-size:14px;font-weight:700;color:var(--red)">⚠ ล้างข้อมูลทั้งหมด</h3>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">ลบ shipment, terminal, checklist และท่าเรือทั้งหมดบนเครื่องนี้ — ควรดาวน์โหลดไฟล์สำรองก่อน</div>
+        </div>
+        <button class="btn btn-danger" onclick="clearAllData()">🗑️ ล้างข้อมูลทั้งหมด</button>
+      </div>
+    </div>
+
+    <input type="file" id="backup_file_input" accept="application/json,.json" style="display:none" onchange="onBackupFileSelected(this)">
+  `;
+}
+
+// ── Cloud Sync settings page ────────────────────────────────────────────────
+function render_cloud(){
+  g('topbar_actions').innerHTML = '';
+  const connected = CLOUD.connected;
+  const pid = CLOUD.config && CLOUD.config.projectId ? CLOUD.config.projectId : '';
+  const savedCfg = (()=>{ try{ return localStorage.getItem(LS_FBCFG)||''; }catch(e){ return ''; } })();
+  const prettySaved = savedCfg
+    ? (()=>{ try{ return JSON.stringify(JSON.parse(savedCfg),null,2); }catch(e){ return savedCfg; } })()
+    : '';
+  const rules = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // CS Ops Hub — shared team data; only signed-in (Google) teammates
+    match /${_collPrefix}_shipments/{doc} {
+      allow read, write: if request.auth != null;
+    }
+    match /${_collPrefix}_meta/{doc} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}`;
+  const user = CLOUD.user;
+  const fbReady = !!CLOUD.auth;
+  const authBlock = user
+    ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+         ${user.photoURL?`<img src="${escapeHtml(user.photoURL)}" style="width:32px;height:32px;border-radius:50%" referrerpolicy="no-referrer">`:''}
+         <div><div style="font-weight:700">${escapeHtml(user.displayName||'')}</div><div style="font-size:12px;color:var(--muted)">${escapeHtml(user.email||'')}</div></div>
+         <button class="btn btn-ghost" style="margin-left:auto" onclick="signOutCloud()">ออกจากระบบ</button>
+       </div>`
+    : fbReady
+      ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+           <button class="btn btn-primary" onclick="signInGoogle()">🔐 ลงชื่อเข้าใช้ด้วย Google</button>
+           <span style="font-size:12px;color:var(--muted)">เชื่อม Firebase แล้ว — ลงชื่อเข้าใช้เพื่อซิงค์ข้อมูล</span>
+         </div>`
+      : `<div style="font-size:12.5px;color:var(--muted)">ยังไม่ได้เชื่อม Firebase — วาง config ของโปรเจกต์ CS Ops Hub ด้านล่างแล้วกด <b>เชื่อมต่อ</b> ก่อน</div>`;
+  g('page-cloud').innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-pad" style="border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <h3 style="font-family:var(--disp);font-size:14px;font-weight:700">☁️ สถานะการเชื่อมต่อ</h3>
+        <div id="cloud_status" style="font-size:13px"></div>
+      </div>
+      <div class="card-pad" style="font-size:13px;color:var(--slate);line-height:1.7">
+        เข้าสู่ระบบด้วย <b>Google account ของแต่ละคน</b> แล้วทั้งทีมจะแชร์ข้อมูล shipment/เอกสารชุดเดียวกันแบบ <b>เรียลไทม์</b> (CS แก้งานหนึ่ง Document แก้อีกงานพร้อมกันได้ ไม่ทับกัน) — ระบบนี้แยกเป็นของ CS Ops Hub เอง ใช้ <b>Firebase project ของตัวเอง</b> ไม่เกี่ยวกับ Sea Freight Pro
+        <div style="margin-top:12px">${authBlock}</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-pad" style="border-bottom:1px solid var(--line)"><h3 style="font-family:var(--disp);font-size:14px;font-weight:700">⚙ Firebase config (โปรเจกต์ของ CS Ops Hub)</h3></div>
+      <div class="card-pad">
+        <p style="font-size:12.5px;color:var(--muted);margin:0 0 8px">เปิด Firebase Console → โปรเจกต์ของ CS Ops Hub → Project settings → Your apps → SDK setup → คัดลอกอ็อบเจกต์ <code>firebaseConfig</code> มาวาง แล้วกดเชื่อมต่อ</p>
+        <textarea id="fb_config_input" class="inp" style="width:100%;min-height:150px;font-family:var(--mono);font-size:12px" placeholder='{ apiKey: &quot;…&quot;, authDomain: &quot;cs-ops-hub.firebaseapp.com&quot;, projectId: &quot;cs-ops-hub&quot;, appId: &quot;…&quot; }'>${escapeHtml(prettySaved)}</textarea>
+        <div style="margin-top:10px"><button class="btn btn-primary" onclick="connectCloudFromInput()">🔗 เชื่อมต่อ</button> ${savedCfg?`<button class="btn btn-ghost" onclick="forgetCloudConfig()">🗑 ลบ config</button>`:''}</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-pad" style="border-bottom:1px solid var(--line)"><h3 style="font-family:var(--disp);font-size:14px;font-weight:700">🔑 ชื่อชุดข้อมูล (Collection prefix) — ตัวเลือก</h3></div>
+      <div class="card-pad" style="font-size:13px;color:var(--slate);line-height:1.7">
+        ปกติใช้ค่าเริ่มต้นได้เลย — CS Ops Hub เก็บข้อมูลไว้ที่ <b style="font-family:var(--mono)">${escapeHtml(shipColl())}</b> และ <b style="font-family:var(--mono)">${escapeHtml(metaColl())}</b>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+          <input id="coll_prefix_input" class="inp" style="max-width:220px;font-family:var(--mono)" value="${escapeHtml(_collPrefix)}" placeholder="cshub">
+          <button class="btn btn-ghost" onclick="saveCollPrefix()">บันทึก prefix</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">ตั้งให้ตรงกันทุกเครื่องของ CS Ops Hub</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-pad" style="border-bottom:1px solid var(--line)"><h3 style="font-family:var(--disp);font-size:14px;font-weight:700">วิธีตั้งค่าตั้งแต่ต้น</h3></div>
+      <div class="card-pad" style="font-size:13px;color:var(--slate);line-height:1.7">
+        <b>1) สร้าง Firebase project ใหม่ของ CS Ops Hub</b>
+        <ol style="margin:6px 0 12px 18px;padding:0">
+          <li>console.firebase.google.com → Add project (เช่นชื่อ <code>cs-ops-hub</code>)</li>
+          <li>Build → Firestore Database → Create database (region <code>asia-southeast1</code>)</li>
+          <li>Authentication → Sign-in method → เปิด <b>Google</b> provider</li>
+          <li>Project settings → Your apps → Web app (&lt;/&gt;) → คัดลอก <code>firebaseConfig</code></li>
+        </ol>
+        <b>2) Firestore Rules</b> (แท็บ Rules → วาง → Publish)
+        <pre style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;margin:6px 0 12px">${escapeHtml(rules)}</pre>
+        <div style="background:var(--card2);border:1px solid var(--amber);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--slate);margin-bottom:12px">เปิดให้เฉพาะคนที่ <b>ลงชื่อเข้าใช้</b> อยากจำกัดเฉพาะอีเมลในทีม เปลี่ยนเป็น <code>request.auth.token.email in ['a@gmail.com','b@gmail.com']</code></div>
+        <b>3) วาง config ด้านบน → เชื่อมต่อ → ลงชื่อเข้าใช้ด้วย Google</b>
+        <br><br><b>4) โฮสต์บน GitHub Pages</b>
+        <ol style="margin:6px 0 0 18px;padding:0">
+          <li>push ไฟล์นี้เป็น <code>index.html</code> ขึ้น repo → Settings → Pages → Deploy from branch → main → /(root)</li>
+          <li>Firebase → Authentication → Settings → Authorized domains → เพิ่มโดเมน GitHub Pages (เช่น <code>yourname.github.io</code>)</li>
+          <li>เปิดลิงก์ในทุกเครื่อง → ลงชื่อเข้าใช้ Google → ข้อมูลตรงกันทันที</li>
+        </ol>
+      </div>
+    </div>
+  `;
+  setCloudStatus(CLOUD.status);
+}
+
+// ── Init ───────────────────────────────────────────
+loadAll();
+goPage('dashboard');
+cloudAutoConnect();
+
+</script>
+
+</body>
+</html>
