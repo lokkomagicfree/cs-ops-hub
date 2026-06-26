@@ -1173,6 +1173,11 @@ function render_shipments(){
     return true;
   });
 
+  // Always show rows ordered by ETD (earliest first); shipments without an ETD
+  // sink to the bottom. New shipments slot into the right position automatically.
+  const etdSortKey = s=>{ const dt=parseFlexibleDate(s.etd); return (dt && !isNaN(dt)) ? dt.getTime() : Infinity; };
+  view.sort((a,b)=> etdSortKey(a.s) - etdSortKey(b.s));
+
   // Alert strip — active shipments only
   const activeShips = shipments.filter(s=>s.status!=='Completed' && s.status!=='Cancelled');
   const aciCount = activeShips.filter(s=>destCountry(s)==='CA').length;
