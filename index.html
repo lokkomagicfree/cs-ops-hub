@@ -1661,6 +1661,7 @@ window.duplicateShipment = function(idx){
   copy._revisedFields = [];
   copy._bpdfFinalized = false;
   copy._bpdfBaseline = null;
+  copy._bpdfEdited = {};
   copy.checklist = null;
   copy.payment = {ap:false, ar:false}; // fresh payment state for the new booking
   if(copy.bpdfData) copy.bpdfData.bkgno = ''; // booking no. inside the PDF preset too
@@ -1952,10 +1953,14 @@ window.openBookingPdfModal = function(idx){
     puRef:       s.bookingNo||'',  // Pick Up Ref. follows the Booking No.
     tiRef:       s.bookingNo||'',  // Turn-In Ref. follows the Booking No.
   };
-  // Table always wins for the linked fields (overwrite even if it clears a value);
-  // everything else stays as previously entered in the booking form.
-  const d0 = { ...(s.bpdfData||{}), ...gridLinked };
-  if(!d0.shipper) d0.shipper = s.customer||''; // Shipper may differ, so only fill when empty
+  // Start from the saved booking data (so manual edits persist), then let the
+  // grid fill ONLY the linked fields the user has NOT manually edited. This keeps
+  // the table as the source of truth for untouched fields while preserving any
+  // value the user typed in the booking form.
+  const edited = s._bpdfEdited || {};
+  const d0 = { ...(s.bpdfData||{}) };
+  Object.keys(gridLinked).forEach(k=>{ if(!edited[k]) d0[k] = gridLinked[k]; });
+  if(!d0.shipper && !edited.shipper) d0.shipper = s.customer||''; // Shipper may differ, so only fill when empty/untouched
 
   // Every booking field renders from the merged d0 object, so the form always
   // reflects the linked grid values (plus booking-only data) consistently.
@@ -2065,12 +2070,17 @@ window.openBookingPdfModal = function(idx){
 };
 
 window.markFieldRevised = function(ev){
-  // Live-highlight as the user types, only meaningful after at least one save exists
   const s = shipments[_bpdfShipIdx];
-  if(!s || !s.bpdfData || Object.keys(s.bpdfData).length===0) return; // nothing saved yet — first entry, not a revision
+  if(!s) return;
   const id = ev.target.id;
   if(!id || !id.startsWith('bpdf_')) return;
-  ev.target.classList.add('revised-field');
+  // Remember that the user manually edited this field, so the grid no longer
+  // overwrites it on reopen (this is what makes booking-form edits persist).
+  const key = id.slice(5); // strip 'bpdf_'
+  s._bpdfEdited = s._bpdfEdited || {};
+  s._bpdfEdited[key] = true;
+  // Live-highlight as the user types, only meaningful after at least one save exists
+  if(s.bpdfData && Object.keys(s.bpdfData).length>0) ev.target.classList.add('revised-field');
 };
 
 function collectBpdfForm(){
@@ -2164,15 +2174,60 @@ window.saveTerminalFromBpdf = function(prefix){ // prefix is 'pu' or 'ti'
 // Saves the form. If this is not the first save, diffs against the previous
 // snapshot, records which fields changed, bumps the revision counter, and
 // remembers the changed-field list so the PDF/modal can highlight them.
+// Booking-form field -> grid column. Saving the booking form writes the user's
+// edits back to the table for these fields (dates convert to the grid's
+// YYYY-MM-DD storage format). Only fields the user actually edited are pushed,
+// so untouched, grid-prefilled values never clobber the table.
+const BPDF_TO_GRID = [
+  {b:'bkgno',         g:'bookingNo'},
+  {b:'carrier',       g:'carrier'},
+  {b:'vsl',           g:'feeder'},
+  {b:'motherVsl',     g:'motherVsl'},
+  {b:'portReceive',   g:'por'},
+  {b:'portLoading',   g:'pol'},
+  {b:'portDischarge', g:'pod'},
+  {b:'finalDest',     g:'fpod'},
+  {b:'volume',        g:'vol'},
+  {b:'etd',           g:'etd', date:true},
+  {b:'siCutoff',      g:'si',  date:true},
+  {b:'vgmCutoff',     g:'vgm', date:true},
+  {b:'cfmBl',         g:'bl',  date:true},
+  {b:'gateClosing',   g:'cy',  date:true},
+];
+function toGridIsoDate(str){
+  const dt = parseFlexibleDate(str);
+  if(!dt || isNaN(dt)) return null; // unparseable -> skip (don't corrupt the cell)
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+function writeBackBpdfToGrid(s){
+  const edited = s._bpdfEdited || {};
+  const d = s.bpdfData || {};
+  BPDF_TO_GRID.forEach(m=>{
+    if(!edited[m.b]) return; // only push fields the user manually edited
+    let val = (d[m.b]==null?'':String(d[m.b])).trim();
+    if(m.date){
+      if(val===''){ s[m.g]=''; return; }
+      const iso = toGridIsoDate(val);
+      if(iso===null) return; // leave grid value as-is if not parseable
+      s[m.g] = iso;
+    }else{
+      s[m.g] = val;
+    }
+  });
+}
+
 window.saveBpdfData = function(silent){
   const s = shipments[_bpdfShipIdx]; if(!s) return;
   // Save persists the current form. It does NOT count as a revision — only an
   // export (generateBookingPDF) creates a revision round. The official baseline
   // is the last EXPORTED version.
   s.bpdfData = collectBpdfForm();
+  writeBackBpdfToGrid(s);          // push edited fields back into the table
+  syncAutoStatus(s);               // ETD may have changed -> re-check status
+  applyAmsDefault(s);              // POD/FPOD may have changed -> re-check AMS/ISF/ACI
   s._revisedFields = bpdfChangedVsBaseline(s); // yellow highlight vs last export
   saveShipments();
-  if(!silent){ toast('💾 Saved (ยังไม่นับ Revise จนกว่าจะ Export)'); rerenderGrid(); }
+  if(!silent){ toast('💾 Saved — อัปเดตในตารางให้แล้ว'); rerenderGrid(); }
 };
 
 // Clears all revision history for this shipment's booking PDF and resets the
