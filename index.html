@@ -784,15 +784,17 @@ const GRID_COLS = [
   {k:'bookingNo', label:'Booking No.', type:'text', w:120, mono:true},
   {k:'jobno',     label:'Job No.',     type:'text', w:140, mono:true},
   {k:'customer',  label:'Customer',    type:'text', w:160},
+  {k:'custRef',   label:'Customer REF', type:'text', w:140},
   {k:'sale',      label:'Sale',        type:'text', w:120},
   {k:'cs',        label:'CS',          type:'text', w:110},
-  {k:'cy',        label:'CY',          type:'date', cutoff:true, noTint:true},
-  {k:'rtn',       label:'RTN',         type:'date', cutoff:true, noTint:true},
+  {k:'cy',        label:'CY',          type:'date'},
+  {k:'rtn',       label:'RTN',         type:'date'},
   {k:'si',        label:'SI',          type:'date', cutoff:true},
   {k:'vgm',       label:'VGM',         type:'date', cutoff:true},
   {k:'bl',        label:'BL',          type:'date', cutoff:true},
   {k:'amsaci',    label:'AMS/ISF/ACI', type:'select', options:['','YES','NO','ISF SENT'], w:120},
   {k:'etd',       label:'ETD',         type:'date'},
+  {k:'eta',       label:'ETA',         type:'date'},
   {k:'__payment', label:'AP/AR',       type:'payment'},
   {k:'req',       label:'REQ',         type:'text', w:170},
   {k:'vol',       label:'VOL',         type:'text', w:90},
@@ -1158,7 +1160,7 @@ function render_shipments(){
     if(_shipCS!=='all' && ((s.cs||'').trim()||'—')!==_shipCS) return false;
     // global quick-search across key fields
     if(q){
-      const txt = [s.bookingNo,s.jobno,s.customer,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod,s.req,s.vol].join(' ').toLowerCase();
+      const txt = [s.bookingNo,s.jobno,s.customer,s.custRef,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod,s.req,s.vol].join(' ').toLowerCase();
       if(!txt.includes(q)) return false;
     }
     // per-column Excel-style filters (chosen value sets)
@@ -1295,7 +1297,7 @@ function render_documents(){
     if(_docMonth!=='all' && monthKey(s.etd)!==_docMonth) return false;
     if(_docName!=='all' && ((s.docName||'').trim()||'—')!==_docName) return false;
     if(q){
-      const txt = [s.docName,s.bookingNo,s.jobno,s.customer,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod].join(' ').toLowerCase();
+      const txt = [s.docName,s.bookingNo,s.jobno,s.customer,s.custRef,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod].join(' ').toLowerCase();
       if(!txt.includes(q)) return false;
     }
     return true;
@@ -1385,9 +1387,9 @@ window.newRowInput = function(field, val, el){
   const seedCS  = (_shipCS!=='all' && _shipCS!=='—') ? _shipCS : '';
   const s = {
     id: uid('ship'),
-    bookingNo:'', jobno:'', customer:'', sale:'', cs:seedCS, carrier:'',
+    bookingNo:'', jobno:'', customer:'', custRef:'', sale:'', cs:seedCS, carrier:'',
     por:'', pol:'', pod:'', fpod:'', vol:'', feeder:'', motherVsl:'', req:'', amsaci:'',
-    cy:'', rtn:'', si:'', vgm:'', bl:'', etd:seedEtd,
+    cy:'', rtn:'', si:'', vgm:'', bl:'', etd:seedEtd, eta:'',
     payment:{ap:false, ar:false}, status:'In Process',
     bpdfData:{}, revisions:[], checklist:null,
     statusHistory:[{status:'In Process', date:new Date().toISOString()}],
@@ -1658,6 +1660,7 @@ window.duplicateShipment = function(idx){
   copy.revisions = [];
   copy._revisedFields = [];
   copy._bpdfFinalized = false;
+  copy._bpdfBaseline = null;
   copy.checklist = null;
   copy.payment = {ap:false, ar:false}; // fresh payment state for the new booking
   if(copy.bpdfData) copy.bpdfData.bkgno = ''; // booking no. inside the PDF preset too
@@ -1908,6 +1911,13 @@ function bf(s, key){ // input value, falling back to '' — shorthand for the mo
 function brv(s, key){ // returns 'revised-field' class if this field changed in the latest revision
   return (s._revisedFields||[]).includes(key) ? 'revised-field' : '';
 }
+// Fields that differ from the last EXPORTED version (the official baseline).
+// Used for the yellow highlight and to decide what a new export revises.
+function bpdfChangedVsBaseline(s){
+  if(!s._bpdfFinalized || !s._bpdfBaseline) return [];
+  const cur = s.bpdfData||{};
+  return BPDF_FIELDS.filter(f => JSON.stringify(s._bpdfBaseline[f]||'') !== JSON.stringify(cur[f]||''));
+}
 
 window.openBookingPdfModal = function(idx){
   g('bpdf_modal')?.remove(); // remove any stale instance first (prevents duplicate-ID bugs)
@@ -1915,6 +1925,7 @@ window.openBookingPdfModal = function(idx){
   const s = shipments[idx]; if(!s) return;
   if(!s.bpdfData) s.bpdfData = {};
   if(!s.revisions) s.revisions = [];
+  s._revisedFields = bpdfChangedVsBaseline(s); // highlight = changes since last export
   const revCount = s.revisions.length;
 
   // The Booking Confirmation is the TABLE's mirror. Every field the grid owns is
@@ -2044,6 +2055,7 @@ window.openBookingPdfModal = function(idx){
         <div class="modal-foot">
           <button class="btn btn-ghost" onclick="closeModal('bpdf_modal');g('bpdf_modal').remove()">Close</button>
           <button class="btn btn-ghost" onclick="saveBpdfData(false)">💾 Save</button>
+          <button class="btn btn-ghost" onclick="generateBookingPDF('preview')">👁 Preview</button>
           <button class="btn btn-primary" onclick="generateBookingPDF()">⬇ Export PDF</button>
         </div>
       </div>
@@ -2154,24 +2166,13 @@ window.saveTerminalFromBpdf = function(prefix){ // prefix is 'pu' or 'ti'
 // remembers the changed-field list so the PDF/modal can highlight them.
 window.saveBpdfData = function(silent){
   const s = shipments[_bpdfShipIdx]; if(!s) return;
-  const newData = collectBpdfForm();
-  // Only treat this as a "revision" if the data was previously finalized
-  // (i.e. the user had already clicked Save or Export at least once) —
-  // otherwise auto-save firing mid-typing on the very first entry would
-  // incorrectly count as a revision.
-  const wasFinalized = !!s._bpdfFinalized;
-
-  if(wasFinalized){
-    const changed = BPDF_FIELDS.filter(f => JSON.stringify(s.bpdfData[f]||'') !== JSON.stringify(newData[f]||''));
-    if(changed.length){
-      s.revisions.push({ at:new Date().toISOString(), changedFields:changed, previous:{...s.bpdfData} });
-      s._revisedFields = changed;
-    }
-  }
-  s.bpdfData = newData;
-  if(!silent) s._bpdfFinalized = true; // explicit Save/Export marks this version as "official"
+  // Save persists the current form. It does NOT count as a revision — only an
+  // export (generateBookingPDF) creates a revision round. The official baseline
+  // is the last EXPORTED version.
+  s.bpdfData = collectBpdfForm();
+  s._revisedFields = bpdfChangedVsBaseline(s); // yellow highlight vs last export
   saveShipments();
-  if(!silent){ toast('💾 Saved'); rerenderGrid(); }
+  if(!silent){ toast('💾 Saved (ยังไม่นับ Revise จนกว่าจะ Export)'); rerenderGrid(); }
 };
 
 // Clears all revision history for this shipment's booking PDF and resets the
@@ -2182,6 +2183,7 @@ window.clearBpdfRevisions = function(){
   s.revisions = [];
   s._revisedFields = [];
   s._bpdfFinalized = false;
+  s._bpdfBaseline = null;
   saveShipments();
   toast('🧹 ล้างประวัติ Revise แล้ว');
   openBookingPdfModal(_bpdfShipIdx); // re-render modal to drop highlights & banner
@@ -2199,20 +2201,43 @@ document.addEventListener('input', function(ev){
 function gv(s, key){ return ((s.bpdfData||{})[key] || '').toString(); }
 
 // ── Export to PDF — exact layout match with Sea Freight Pro's Booking Confirmation ──
-window.generateBookingPDF = function(){
-  saveBpdfData(true);
+window.generateBookingPDF = function(mode){
+  const preview = mode==='preview';
+  saveBpdfData(true); // persist current form (no revise count here)
   const s = shipments[_bpdfShipIdx]; if(!s) return;
-  s._bpdfFinalized = true; // exporting also marks this version as "official" for revision tracking
-  saveShipments();
+  if(!preview){
+    // Revision accounting — count ONE revision per export of a changed version
+    // (per round, not per field). The first export is the original (count stays 0).
+    if(s._bpdfFinalized && s._bpdfBaseline){
+      const changed = bpdfChangedVsBaseline(s);
+      if(changed.length){
+        if(!s.revisions) s.revisions = [];
+        s.revisions.push({ at:new Date().toISOString(), changedFields:changed, previous:{...s._bpdfBaseline} });
+        s._revisedFields = changed; // highlight what changed in this revision
+      }
+    }
+    s._bpdfFinalized = true;
+    s._bpdfBaseline = {...(s.bpdfData||{})}; // this exported version becomes the official baseline
+    saveShipments();
+  }
   if(!window.jspdf){ toast('⏳ jsPDF loading... please try again'); return; }
   const { jsPDF } = window.jspdf;
   if(!jsPDF){ toast('❌ jsPDF not loaded'); return; }
   toast('⏳ Generating PDF...');
 
   const d = s.bpdfData||{};
-  const revisedFields = s._revisedFields || [];
-  const revCount = (s.revisions||[]).length;
-  const isRevised = revCount > 0;
+  let revisedFields, revCount, isRevised;
+  if(preview){
+    const pending = bpdfChangedVsBaseline(s);
+    const willRevise = s._bpdfFinalized && s._bpdfBaseline && pending.length>0;
+    revCount = (s.revisions||[]).length + (willRevise?1:0);
+    revisedFields = willRevise ? pending : (s._revisedFields||[]);
+    isRevised = revCount > 0;
+  }else{
+    revisedFields = s._revisedFields || [];
+    revCount = (s.revisions||[]).length;
+    isRevised = revCount > 0;
+  }
   const isRev = key => revisedFields.includes(key);
 
   const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
@@ -2429,11 +2454,15 @@ window.generateBookingPDF = function(){
     lines.forEach(ln=>{ doc.text(ln,C1,ry); ry+=3.8; });
   });
 
-  // Download
+  // Download / Preview
   const fileSafeBooking = (gv(s,'bkgno')||'DRAFT').toUpperCase().replace(/[^A-Z0-9_-]/gi,'');
   const fname = isRevised
     ? `Revised_${revCount}_BOOKINGCONFIRMATION_${fileSafeBooking}.pdf`
     : `BOOKINGCONFIRMATION_${fileSafeBooking}.pdf`;
+  if(preview){
+    showBpdfPreview(doc);
+    return;
+  }
   doc.save(fname);
   toast('📥 Downloaded: '+fname);
   // Exporting the Booking Confirmation moves a fresh shipment from In Process -> Confirmed
@@ -2448,6 +2477,24 @@ window.generateBookingPDF = function(){
   rerenderGrid();
 };
 
+// Live preview of the Booking Confirmation in an embedded viewer (no download,
+// no revision count). The user can export for real from inside the viewer.
+function showBpdfPreview(doc){
+  g('bpdf_preview_modal')?.remove();
+  const url = doc.output('bloburl');
+  document.body.insertAdjacentHTML('beforeend', `
+  <div class="modal-overlay open" id="bpdf_preview_modal" style="z-index:1000">
+    <div class="modal" style="max-width:920px;width:96vw;height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+      <div class="modal-head" style="padding:14px 18px"><h2 style="margin:0">👁 ตัวอย่าง Booking Confirmation</h2><button class="btn-icon" onclick="g('bpdf_preview_modal').remove()">✕</button></div>
+      <div style="flex:1;background:#525659"><iframe src="${url}" style="width:100%;height:100%;border:0" title="Booking Confirmation preview"></iframe></div>
+      <div class="modal-foot" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 18px">
+        <button class="btn btn-ghost" onclick="g('bpdf_preview_modal').remove()">ปิด</button>
+        <button class="btn btn-primary" onclick="g('bpdf_preview_modal').remove();generateBookingPDF()">📥 Export (นับ Revise + ดาวน์โหลด)</button>
+      </div>
+    </div>
+  </div>`);
+}
+
 // ═══════════════════════════════════════════════════════
 // CUT-OFF TRACKING — overview across all shipments
 // ═══════════════════════════════════════════════════════
@@ -2455,8 +2502,6 @@ const CUTOFF_DEFS = [
   {key:'si',  label:'SI Cut-off',       who:'Ours'},
   {key:'vgm', label:'VGM Cut-off',      who:'Ours'},
   {key:'bl',  label:'BL Confirm (CFM)', who:'Ours'},
-  {key:'cy',  label:'CY Cut-off',       who:'Carrier'},
-  {key:'rtn', label:'RTN',              who:'Carrier'},
 ];
 
 function cutoffUrgency(dtStr){
