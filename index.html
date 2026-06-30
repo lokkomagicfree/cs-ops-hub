@@ -275,6 +275,7 @@ function loadAll(){
   try{ terminals = JSON.parse(localStorage.getItem(LS_TERMINALS)||'[]'); }catch(e){ terminals=[]; }
   try{ checklistTemplates = JSON.parse(localStorage.getItem(LS_CHECKLISTS)||'[]'); }catch(e){ checklistTemplates=[]; }
   try{ ports = JSON.parse(localStorage.getItem(LS_PORTS)||'[]'); }catch(e){ ports=[]; }
+  shipments = shipments.filter(s=> !isBlankShipment(s)); // drop empty/junk rows
   // Migrate older shipment records to the new Excel-style grid model: carry the
   // old single "Final Destination (del)" into the new FPOD column, and make sure
   // an AP/AR payment object exists so the payment checklist cell always works.
@@ -392,6 +393,19 @@ window.saveCustomPort = function(id){
 
 
 function saveShipments(){ try{ localStorage.setItem(LS_SHIPMENTS, JSON.stringify(shipments)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncShipments(); }
+// A shipment is "blank" (junk to be pruned) when it carries no user-entered data
+// at all. Auto/default fields (cs, status, amsaci, payment) don't count, so a row
+// only exists once the user actually types something — legit rows are never blank.
+function isBlankShipment(s){
+  if(!s || typeof s!=='object') return true;
+  const F = ['bookingNo','jobno','customer','hblNo','custRef','sale','carrier',
+             'por','pol','pod','fpod','vol','feeder','motherVsl','req',
+             'etd','eta','si','vgm','bl','cy','rtn'];
+  for(const k of F){ if((s[k]||'').toString().trim()!=='') return false; }
+  if(s.bpdfData && Object.keys(s.bpdfData).some(k=>(s.bpdfData[k]||'').toString().trim()!=='')) return false;
+  if(Array.isArray(s.revisions) && s.revisions.length) return false;
+  return true;
+}
 function saveTerminals(){ try{ localStorage.setItem(LS_TERMINALS, JSON.stringify(terminals)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncConfig(); }
 function saveChecklistTemplates(){ try{ localStorage.setItem(LS_CHECKLISTS, JSON.stringify(checklistTemplates)); }catch(e){ toast('❌ Save failed: '+e.message); } cloudSyncConfig(); }
 
@@ -513,14 +527,16 @@ function startCloudListeners(){
   CLOUD.unsubShip && CLOUD.unsubShip();
   CLOUD.unsubShip = onSnapshot(collection(CLOUD.db,shipColl()), snap=>{
     if(snap.metadata && snap.metadata.hasPendingWrites) return; // skip our own echo
-    const remote = []; snap.forEach(d=> remote.push(d.data()));
+    const remote = []; const blankDocIds = [];
+    snap.forEach(d=>{ const data = d.data(); if(isBlankShipment(data)) blankDocIds.push(d.id); else remote.push(data); });
+    if(blankDocIds.length) deleteCloudDocs(blankDocIds); // clean junk/empty rows out of the shared collection
     if(CLOUD.firstShipSnap){
       CLOUD.firstShipSnap = false;
-      // Union-merge: push any shipment that exists only on THIS device up to the
-      // shared cloud, so nothing is lost and every signed-in teammate converges
-      // to the full set (cloud is otherwise the source of truth).
+      // Union-merge: push any (non-blank) shipment that exists only on THIS device
+      // up to the shared cloud, so nothing is lost and every signed-in teammate
+      // converges to the full set (cloud is otherwise the source of truth).
       const remoteIds = new Set(remote.map(s=>s.id).filter(Boolean));
-      const localOnly = shipments.filter(s=> s.id && !remoteIds.has(s.id));
+      const localOnly = shipments.filter(s=> s.id && !remoteIds.has(s.id) && !isBlankShipment(s));
       if(localOnly.length) pushShipmentDocs(localOnly);
       applyRemoteShipments(remote.concat(localOnly)); // show the union immediately
       return;
@@ -535,6 +551,13 @@ function startCloudListeners(){
   }, ()=>{});
 }
 
+async function deleteCloudDocs(docIds){
+  if(!CLOUD.fs || !docIds || !docIds.length) return;
+  try{
+    const { doc, deleteDoc } = CLOUD.fs;
+    for(const id of docIds){ try{ await deleteDoc(doc(CLOUD.db,shipColl(),id)); }catch(e){} delete _syncedShip[id]; }
+  }catch(e){}
+}
 async function pushShipmentDocs(list){
   try{
     const { doc, setDoc } = CLOUD.fs;
@@ -586,7 +609,7 @@ function cloudSyncShipments(){
       const { doc, setDoc, deleteDoc } = CLOUD.fs;
       const seen = {};
       for(const s of shipments){
-        if(!s.id) continue;
+        if(!s.id || isBlankShipment(s)) continue; // never sync empty/junk rows
         seen[s.id] = 1;
         const j = JSON.stringify(s);
         if(_syncedShip[s.id] !== j){ await setDoc(doc(CLOUD.db,shipColl(),s.id), JSON.parse(j)); _syncedShip[s.id] = j; }
@@ -808,6 +831,7 @@ const GRID_COLS = [
   {k:'bookingNo', label:'Booking No.', type:'text', w:120, mono:true},
   {k:'jobno',     label:'Job No.',     type:'text', w:140, mono:true},
   {k:'customer',  label:'Customer',    type:'text', w:160},
+  {k:'hblNo',     label:'HBL NO',      type:'text', w:150},
   {k:'custRef',   label:'Customer REF', type:'text', w:140},
   {k:'sale',      label:'Sale',        type:'text', w:120},
   {k:'cs',        label:'CS',          type:'text', w:110},
@@ -1184,7 +1208,7 @@ function render_shipments(){
     if(_shipCS!=='all' && ((s.cs||'').trim()||'—')!==_shipCS) return false;
     // global quick-search across key fields
     if(q){
-      const txt = [s.bookingNo,s.jobno,s.customer,s.custRef,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod,s.req,s.vol].join(' ').toLowerCase();
+      const txt = [s.bookingNo,s.jobno,s.customer,s.hblNo,s.custRef,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod,s.req,s.vol].join(' ').toLowerCase();
       if(!txt.includes(q)) return false;
     }
     // per-column Excel-style filters (chosen value sets)
@@ -1326,7 +1350,7 @@ function render_documents(){
     if(_docMonth!=='all' && monthKey(s.etd)!==_docMonth) return false;
     if(_docName!=='all' && ((s.docName||'').trim()||'—')!==_docName) return false;
     if(q){
-      const txt = [s.docName,s.bookingNo,s.jobno,s.customer,s.custRef,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod].join(' ').toLowerCase();
+      const txt = [s.docName,s.bookingNo,s.jobno,s.customer,s.hblNo,s.custRef,s.sale,s.cs,s.carrier,s.pol,s.pod,s.fpod].join(' ').toLowerCase();
       if(!txt.includes(q)) return false;
     }
     return true;
@@ -1416,7 +1440,7 @@ window.newRowInput = function(field, val, el){
   const seedCS  = (_shipCS!=='all' && _shipCS!=='—') ? _shipCS : '';
   const s = {
     id: uid('ship'),
-    bookingNo:'', jobno:'', customer:'', custRef:'', sale:'', cs:seedCS, carrier:'',
+    bookingNo:'', jobno:'', customer:'', hblNo:'', custRef:'', sale:'', cs:seedCS, carrier:'',
     por:'', pol:'', pod:'', fpod:'', vol:'', feeder:'', motherVsl:'', req:'', amsaci:'',
     cy:'', rtn:'', si:'', vgm:'', bl:'', etd:seedEtd, eta:'',
     payment:{ap:false, ar:false}, status:'In Process',
@@ -1924,8 +1948,8 @@ const BPDF_FIELDS = [
   'shipper','shipperRef','bkgno','carrier','vsl','motherVsl','etd','eta',
   'portReceive','portDischarge','portLoading','finalDest','portTransit','volume',
   'siCutoff','cfmBl','vgmCutoff','gateClosing','paperless',
-  'puRef','puDate','puTerminalId','puTerminalFree','puPic',
-  'tiRef','tiDate','tiTerminalId','tiTerminalFree','tiPic',
+  'puRef','puDate','puTerminalId','puTerminalFree','puTerminalAddress','puPic',
+  'tiRef','tiDate','tiTerminalId','tiTerminalFree','tiTerminalAddress','tiPic',
   'commodity','weight','hsCode','specialRemark',
 ];
 
@@ -2060,6 +2084,7 @@ window.openBookingPdfModal = function(idx){
               </select>
               <button type="button" class="btn btn-sm btn-ghost" onclick="saveTerminalFromBpdf('pu')" title="บันทึกเข้ารายการ Terminal/Depot" style="flex-shrink:0">💾</button>
             </div>
+            <input id="bpdf_puTerminalAddress" class="inp ${brv(s,'puTerminalAddress')}" placeholder="ที่อยู่ (เลือก Terminal แล้วเด้งมาเอง / แก้ได้)" value="${dv('puTerminalAddress')}" style="margin-top:6px">
           </div>
           <div class="inp-group full-col"><label class="inp-lbl">Pick Up PIC.</label><input id="bpdf_puPic" class="inp ${brv(s,'puPic')}" value="${dv('puPic')}"></div>
 
@@ -2079,6 +2104,7 @@ window.openBookingPdfModal = function(idx){
               </select>
               <button type="button" class="btn btn-sm btn-ghost" onclick="saveTerminalFromBpdf('ti')" title="บันทึกเข้ารายการ Terminal/Depot" style="flex-shrink:0">💾</button>
             </div>
+            <input id="bpdf_tiTerminalAddress" class="inp ${brv(s,'tiTerminalAddress')}" placeholder="ที่อยู่ (เลือก Terminal แล้วเด้งมาเอง / แก้ได้)" value="${dv('tiTerminalAddress')}" style="margin-top:6px">
           </div>
           <div class="inp-group full-col"><label class="inp-lbl">Turn-In PIC.</label><input id="bpdf_tiPic" class="inp ${brv(s,'tiPic')}" value="${dv('tiPic')}"></div>
 
@@ -2128,9 +2154,11 @@ function collectBpdfForm(){
     paperless: g('bpdf_paperless').value.trim(),
     puRef: g('bpdf_puRef').value.trim(), puDate: g('bpdf_puDate').value.trim(),
     puTerminalId: g('bpdf_puTerminalId').value, puTerminalFree: g('bpdf_puTerminalFree').value.trim(),
+    puTerminalAddress: g('bpdf_puTerminalAddress').value.trim(),
     puPic: g('bpdf_puPic').value.trim(),
     tiRef: g('bpdf_tiRef').value.trim(), tiDate: g('bpdf_tiDate').value.trim(),
     tiTerminalId: g('bpdf_tiTerminalId').value, tiTerminalFree: g('bpdf_tiTerminalFree').value.trim(),
+    tiTerminalAddress: g('bpdf_tiTerminalAddress').value.trim(),
     tiPic: g('bpdf_tiPic').value.trim(),
     commodity: g('bpdf_commodity').value.trim(), weight: g('bpdf_weight').value.trim(),
     hsCode: g('bpdf_hsCode').value.trim(), specialRemark: g('bpdf_specialRemark').value.trim(),
@@ -2146,19 +2174,23 @@ window.onTerminalSelectChange = function(prefix){
   const wrap = g('bpdf_'+prefix+'TerminalFree_wrap');
   const freeInput = g('bpdf_'+prefix+'TerminalFree');
   const picInput = g('bpdf_'+prefix+'Pic');
+  const addrInput = g('bpdf_'+prefix+'TerminalAddress');
   if(sel.value === '__other__'){
     sel.value = ''; // don't let __other__ leak into the saved data as a fake terminal id
     wrap.style.display = 'flex';
     if(freeInput){ freeInput.value=''; freeInput.focus(); }
     if(picInput) picInput.value = '';
+    if(addrInput) addrInput.value = '';
   } else if(sel.value === ''){
     wrap.style.display = 'none';
     if(picInput) picInput.value = '';
+    if(addrInput) addrInput.value = '';
   } else {
     wrap.style.display = 'none';
-    // Auto-fill the PIC field from the selected terminal/depot's saved contact
+    // Auto-fill PIC + Address from the selected terminal/depot's saved details
     const t = terminals.find(x=>x.id===sel.value);
     if(picInput) picInput.value = t?.contact || '';
+    if(addrInput) addrInput.value = t?.address || '';
   }
 };
 
@@ -2168,6 +2200,20 @@ function terminalText(terminalId, freeText){
     if(t) return `${t.name}${t.address?' — '+t.address:''}`;
   }
   return freeText || '';
+}
+// Place name only (no address) — the address is shown on its own line in the PDF.
+function terminalNameOnly(terminalId, freeText){
+  if(terminalId){ const t = terminals.find(x=>x.id===terminalId); if(t) return t.name; }
+  return freeText || '';
+}
+// Address for a pickup/turn-in: the value typed in the form wins; otherwise fall
+// back to the selected terminal/depot's stored address.
+function terminalAddrFor(d, prefix){
+  const explicit = (d[prefix+'TerminalAddress']||'').trim();
+  if(explicit) return explicit;
+  const id = d[prefix+'TerminalId'];
+  if(id){ const t = terminals.find(x=>x.id===id); if(t) return t.address||''; }
+  return '';
 }
 
 // Saves whatever the user typed in the Pick Up / Turn-In free-text field into
@@ -2180,25 +2226,29 @@ window.saveTerminalFromBpdf = function(prefix){ // prefix is 'pu' or 'ti'
   const idSelect = g('bpdf_'+prefix+'TerminalId');
   const wrap = g('bpdf_'+prefix+'TerminalFree_wrap');
   const picInput = g('bpdf_'+prefix+'Pic');
+  const addrInput = g('bpdf_'+prefix+'TerminalAddress');
   const val = (freeInput?.value||'').trim();
   if(!val){ toast('กรุณาพิมพ์ชื่อ/ที่อยู่ Terminal หรือ Depot ก่อนบันทึก'); return; }
 
   // Avoid creating a duplicate if this exact name was already saved
   let t = terminals.find(x=>x.name.toLowerCase() === val.toLowerCase());
   if(!t){
-    // Carry over whatever PIC contact is currently typed in the form, so it's
-    // not lost — the next time this terminal is selected it'll auto-fill.
-    t = { id: uid('term'), type: typeSelect.value, name: val, address:'', contact:(picInput?.value||'').trim(), notes:'' };
+    // Carry over whatever PIC contact + Address is currently typed in the form,
+    // so they're not lost — next time this terminal is selected they auto-fill.
+    t = { id: uid('term'), type: typeSelect.value, name: val, address:(addrInput?.value||'').trim(), contact:(picInput?.value||'').trim(), notes:'' };
     terminals.unshift(t);
     saveTerminals();
     toast('💾 บันทึก "'+val+'" เข้ารายการ '+typeSelect.value+' แล้ว');
   } else {
+    // Existing terminal: if the user typed an address and it didn't have one, fill it in.
+    if(addrInput && addrInput.value.trim() && !t.address){ t.address = addrInput.value.trim(); saveTerminals(); }
     toast('มีรายการนี้อยู่แล้ว — เลือกให้ใช้รายการที่บันทึกไว้');
   }
 
   // Re-render the dropdown options and select the (newly-saved or existing) entry
   idSelect.innerHTML = terminalOptionsHtml(t.id);
   idSelect.value = t.id;
+  if(addrInput) addrInput.value = t.address || addrInput.value;
   wrap.style.display = 'none';
 };
 
@@ -2452,12 +2502,14 @@ window.generateBookingPDF = function(mode){
   y+=RH+2;
 
   // Pickup
-  const puTerminalText = terminalText(d.puTerminalId, d.puTerminalFree);
+  const puTerminalText = terminalNameOnly(d.puTerminalId, d.puTerminalFree);
+  const puTerminalAddr = terminalAddrFor(d, 'pu');
   const puTerminalRevised = isRev('puTerminalId')||isRev('puTerminalFree');
   const puRows=[
     ['Pick up Ref :', gv(s,'puRef'), true, 'puRef'],
     ['Pick up Date :', gv(s,'puDate'), false, 'puDate'],
     ['Pick up Place :', puTerminalText, false, puTerminalRevised?'puTerminalId':'__none'],
+    ['Address :', puTerminalAddr, false, isRev('puTerminalAddress')?'puTerminalAddress':'__none'],
     ['Pick up PIC.:', gv(s,'puPic'), false, 'puPic'],
   ];
   puRows.forEach(([lbl,val,bv,key])=>{
@@ -2472,13 +2524,14 @@ window.generateBookingPDF = function(mode){
   y+=1;
 
   // Turn-in
-  const tiTerminalText = terminalText(d.tiTerminalId, d.tiTerminalFree);
+  const tiTerminalText = terminalNameOnly(d.tiTerminalId, d.tiTerminalFree);
+  const tiTerminalAddr = terminalAddrFor(d, 'ti');
   const tiTerminalRevised = isRev('tiTerminalId')||isRev('tiTerminalFree');
   const tiRows=[
     ['Turn-In Ref :', gv(s,'tiRef'), true, 'tiRef'],
     ['Turn-In Date :', gv(s,'tiDate'), false, 'tiDate'],
     ['Turn-In At :', tiTerminalText, false, tiTerminalRevised?'tiTerminalId':'__none'],
-    ['', '', false, '__none'],
+    ['Address :', tiTerminalAddr, false, isRev('tiTerminalAddress')?'tiTerminalAddress':'__none'],
     ['Turn-In PIC.:', gv(s,'tiPic'), false, 'tiPic'],
     ['', '', false, '__none'],
   ];
