@@ -402,10 +402,20 @@ function saveChecklistTemplates(){ try{ localStorage.setItem(LS_CHECKLISTS, JSON
    Everything still works offline on localStorage; cloud layers on top when
    connected. The Firebase SDK is loaded on demand from the gstatic CDN. */
 const LS_FBCFG = 'cshub_firebase_config';
-// CS Ops Hub runs on its OWN Firebase project (separate from Sea Freight Pro).
-// Paste that project's firebaseConfig in the Cloud Sync page — nothing is
-// embedded here, so there's no default project.
-const DEFAULT_FB_CONFIG = null;
+// CS Ops Hub's OWN Firebase project (cs-workshop-6e4ff) — separate from Sea
+// Freight Pro. Embedded so every device/domain auto-connects without pasting
+// config; each person just signs in with Google. The web apiKey is not a secret
+// (security is enforced by Firestore Rules + Authorized domains). Override it any
+// time from the Cloud Sync page.
+const DEFAULT_FB_CONFIG = {
+  apiKey: "AIzaSyCuRHAT3dROPH3tBT-gQDApbaXRTltcetA",
+  authDomain: "cs-workshop-6e4ff.firebaseapp.com",
+  projectId: "cs-workshop-6e4ff",
+  storageBucket: "cs-workshop-6e4ff.firebasestorage.app",
+  messagingSenderId: "301819886957",
+  appId: "1:301819886957:web:b6fd098202e57d1d0b2e64",
+  measurementId: "G-L71ZQ1DKGT"
+};
 const LS_FBPREFIX = 'cshub_collection_prefix';
 // CS Ops Hub keeps its data under a prefixed collection so it can safely share a
 // Firestore project with Sea Freight Pro without colliding. Editable in the
@@ -621,7 +631,8 @@ window.saveCollPrefix = function(){
 };
 function cloudAutoConnect(){
   let saved=null; try{ saved = JSON.parse(localStorage.getItem(LS_FBCFG)||'null'); }catch(e){}
-  if(saved) connectCloud(saved); // sets up auth; resumes Google session if any
+  const cfg = saved || DEFAULT_FB_CONFIG;
+  if(cfg) connectCloud(cfg); // sets up auth; resumes Google session if any
   else setCloudStatus('offline');
 }
 
@@ -3179,7 +3190,7 @@ function render_cloud(){
   const savedCfg = (()=>{ try{ return localStorage.getItem(LS_FBCFG)||''; }catch(e){ return ''; } })();
   const prettySaved = savedCfg
     ? (()=>{ try{ return JSON.stringify(JSON.parse(savedCfg),null,2); }catch(e){ return savedCfg; } })()
-    : '';
+    : JSON.stringify(CLOUD.config || DEFAULT_FB_CONFIG || {}, null, 2);
   const rules = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
