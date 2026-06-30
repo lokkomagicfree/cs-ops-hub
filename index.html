@@ -506,7 +506,14 @@ function startCloudListeners(){
     const remote = []; snap.forEach(d=> remote.push(d.data()));
     if(CLOUD.firstShipSnap){
       CLOUD.firstShipSnap = false;
-      if(remote.length===0 && shipments.length>0){ pushAllLocal(); return; } // seed empty cloud
+      // Union-merge: push any shipment that exists only on THIS device up to the
+      // shared cloud, so nothing is lost and every signed-in teammate converges
+      // to the full set (cloud is otherwise the source of truth).
+      const remoteIds = new Set(remote.map(s=>s.id).filter(Boolean));
+      const localOnly = shipments.filter(s=> s.id && !remoteIds.has(s.id));
+      if(localOnly.length) pushShipmentDocs(localOnly);
+      applyRemoteShipments(remote.concat(localOnly)); // show the union immediately
+      return;
     }
     applyRemoteShipments(remote);
   }, err=> setCloudStatus('error', err.message));
@@ -518,15 +525,21 @@ function startCloudListeners(){
   }, ()=>{});
 }
 
-async function pushAllLocal(){
+async function pushShipmentDocs(list){
   try{
     const { doc, setDoc } = CLOUD.fs;
-    for(const s of shipments){ await setDoc(doc(CLOUD.db,shipColl(),s.id), JSON.parse(JSON.stringify(s))); _syncedShip[s.id]=JSON.stringify(s); }
+    for(const s of list){
+      if(!s.id) continue;
+      await setDoc(doc(CLOUD.db,shipColl(),s.id), JSON.parse(JSON.stringify(s)));
+      _syncedShip[s.id]=JSON.stringify(s);
+    }
+    // Make sure the shared config (ports/terminals/checklists) exists on the cloud too.
     await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates});
     setCloudStatus('online');
-    toast('☁ อัปโหลดข้อมูลในเครื่องขึ้นคลาวด์แล้ว');
+    if(list.length) toast('☁ อัปโหลดงานในเครื่อง '+list.length+' รายการขึ้นคลาวด์แล้ว');
   }catch(e){ setCloudStatus('error', e.message); }
 }
+function pushAllLocal(){ return pushShipmentDocs(shipments); }
 
 function applyRemoteShipments(remote){
   CLOUD.applyingRemote = true;
@@ -1704,10 +1717,12 @@ function cshubShipmentToSfpJob(s){
   return {
     no: s.bookingNo || ('BKG-'+uid('x').slice(-6).toUpperCase()),
     jobno: s.jobno || '',
-    refno: d.shipperRef || '',
+    refno: s.custRef || d.shipperRef || '',  // Customer REF column -> SFP "Ref No."
     customer: s.customer || d.shipper || '',
     shipper: d.shipper || s.customer || '',
-    etd: toSfpDateDisplay(s.etd), eta: toSfpDateDisplay(s.eta),
+    // SFP stores ETD/ETA as ISO (YYYY-MM-DD) from <input type=date>; send raw ISO,
+    // NOT the DD-Mon-YYYY display format, or SFP's date logic reads them as blank.
+    etd: s.etd || '', eta: s.eta || '',
     etdMonth: s.etd ? s.etd.slice(0,7) : 'Unknown',
     etaMonth: s.eta ? s.eta.slice(0,7) : 'Unknown',
     jobType: 'export', vessel: d.vsl||s.feeder||'', motherVessel: d.motherVsl||s.motherVsl||'',
@@ -1719,7 +1734,7 @@ function cshubShipmentToSfpJob(s){
     sell:0, cost:0, profit:0, margin:0, comm:0, commThb:0,
     carrier: s.carrier || d.carrier || '', incoterm:'', consignee:'',
     bltype:'', sc:'', ams:'', commodity: d.commodity||'', hscode: d.hsCode||'',
-    cyDate: toSfpDateDisplay(s.cy)||'', rtnDate: toSfpDateDisplay(s.rtn)||'',
+    cyDate: s.cy || '', rtnDate: s.rtn || '',  // ISO (SFP CY/RTN are date inputs)
     siCutoff: d.siCutoff || toSfpDateDisplay(s.si) || '',
     vgmCutoff: d.vgmCutoff || toSfpDateDisplay(s.vgm) || '',
     docCutoff: d.cfmBl || toSfpDateDisplay(s.bl) || '',
