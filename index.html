@@ -3206,72 +3206,50 @@ service cloud.firestore {
   const user = CLOUD.user;
   const fbReady = !!CLOUD.auth;
   const authBlock = user
-    ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-         ${user.photoURL?`<img src="${escapeHtml(user.photoURL)}" style="width:32px;height:32px;border-radius:50%" referrerpolicy="no-referrer">`:''}
-         <div><div style="font-weight:700">${escapeHtml(user.displayName||'')}</div><div style="font-size:12px;color:var(--muted)">${escapeHtml(user.email||'')}</div></div>
+    ? `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+         ${user.photoURL?`<img src="${escapeHtml(user.photoURL)}" style="width:40px;height:40px;border-radius:50%" referrerpolicy="no-referrer">`:''}
+         <div><div style="font-weight:700;font-size:15px">${escapeHtml(user.displayName||'')}</div><div style="font-size:12px;color:var(--muted)">${escapeHtml(user.email||'')}</div></div>
          <button class="btn btn-ghost" style="margin-left:auto" onclick="signOutCloud()">ออกจากระบบ</button>
        </div>`
-    : fbReady
-      ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-           <button class="btn btn-primary" onclick="signInGoogle()">🔐 ลงชื่อเข้าใช้ด้วย Google</button>
-           <span style="font-size:12px;color:var(--muted)">เชื่อม Firebase แล้ว — ลงชื่อเข้าใช้เพื่อซิงค์ข้อมูล</span>
-         </div>`
-      : `<div style="font-size:12.5px;color:var(--muted)">ยังไม่ได้เชื่อม Firebase — วาง config ของโปรเจกต์ CS Ops Hub ด้านล่างแล้วกด <b>เชื่อมต่อ</b> ก่อน</div>`;
+    : `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:10px">
+         <button class="btn btn-primary" style="font-size:15px;padding:12px 22px" onclick="signInGoogle()">🔐 ลงชื่อเข้าใช้ด้วย Google</button>
+         <span style="font-size:12.5px;color:var(--muted)">${fbReady?'กดปุ่มนี้ปุ่มเดียว แล้วเข้าระบบออนไลน์ได้เลย — ไม่ต้องตั้งค่าอะไร':'⏳ กำลังเชื่อมระบบ… ลองอีกครั้งสักครู่'}</span>
+       </div>`;
   g('page-cloud').innerHTML = `
     <div class="card" style="margin-bottom:16px">
       <div class="card-pad" style="border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <h3 style="font-family:var(--disp);font-size:14px;font-weight:700">☁️ สถานะการเชื่อมต่อ</h3>
+        <h3 style="font-family:var(--disp);font-size:14px;font-weight:700">☁️ ออนไลน์ & แชร์ข้อมูลทั้งทีม</h3>
         <div id="cloud_status" style="font-size:13px"></div>
       </div>
       <div class="card-pad" style="font-size:13px;color:var(--slate);line-height:1.7">
-        เข้าสู่ระบบด้วย <b>Google account ของแต่ละคน</b> แล้วทั้งทีมจะแชร์ข้อมูล shipment/เอกสารชุดเดียวกันแบบ <b>เรียลไทม์</b> (CS แก้งานหนึ่ง Document แก้อีกงานพร้อมกันได้ ไม่ทับกัน) — ระบบนี้แยกเป็นของ CS Ops Hub เอง ใช้ <b>Firebase project ของตัวเอง</b> ไม่เกี่ยวกับ Sea Freight Pro
-        <div style="margin-top:12px">${authBlock}</div>
+        แค่ <b>ลงชื่อเข้าใช้ด้วย Google</b> ก็เข้าระบบออนไลน์ได้เลย — ทั้งทีมเห็นข้อมูล shipment/เอกสารชุดเดียวกันแบบ <b>เรียลไทม์</b> แก้ตรงไหนเซฟขึ้นคลาวด์ให้อัตโนมัติ (ไม่ต้องวาง config / ไม่ต้องกดเชื่อมต่อ)
+        <div style="margin-top:14px">${authBlock}</div>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-pad" style="border-bottom:1px solid var(--line)"><h3 style="font-family:var(--disp);font-size:14px;font-weight:700">⚙ Firebase config (โปรเจกต์ของ CS Ops Hub)</h3></div>
-      <div class="card-pad">
-        <p style="font-size:12.5px;color:var(--muted);margin:0 0 8px">เปิด Firebase Console → โปรเจกต์ของ CS Ops Hub → Project settings → Your apps → SDK setup → คัดลอกอ็อบเจกต์ <code>firebaseConfig</code> มาวาง แล้วกดเชื่อมต่อ</p>
-        <textarea id="fb_config_input" class="inp" style="width:100%;min-height:150px;font-family:var(--mono);font-size:12px" placeholder='{ apiKey: &quot;…&quot;, authDomain: &quot;cs-ops-hub.firebaseapp.com&quot;, projectId: &quot;cs-ops-hub&quot;, appId: &quot;…&quot; }'>${escapeHtml(prettySaved)}</textarea>
-        <div style="margin-top:10px"><button class="btn btn-primary" onclick="connectCloudFromInput()">🔗 เชื่อมต่อ</button> ${savedCfg?`<button class="btn btn-ghost" onclick="forgetCloudConfig()">🗑 ลบ config</button>`:''}</div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-pad" style="border-bottom:1px solid var(--line)"><h3 style="font-family:var(--disp);font-size:14px;font-weight:700">🔑 ชื่อชุดข้อมูล (Collection prefix) — ตัวเลือก</h3></div>
-      <div class="card-pad" style="font-size:13px;color:var(--slate);line-height:1.7">
-        ปกติใช้ค่าเริ่มต้นได้เลย — CS Ops Hub เก็บข้อมูลไว้ที่ <b style="font-family:var(--mono)">${escapeHtml(shipColl())}</b> และ <b style="font-family:var(--mono)">${escapeHtml(metaColl())}</b>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
-          <input id="coll_prefix_input" class="inp" style="max-width:220px;font-family:var(--mono)" value="${escapeHtml(_collPrefix)}" placeholder="cshub">
-          <button class="btn btn-ghost" onclick="saveCollPrefix()">บันทึก prefix</button>
+    <details class="card" style="margin-bottom:16px">
+      <summary class="card-pad" style="cursor:pointer;font-family:var(--disp);font-size:13px;font-weight:700;list-style:none">⚙ ตั้งค่าขั้นสูง (ปกติไม่ต้องแตะ)</summary>
+      <div class="card-pad" style="border-top:1px solid var(--line)">
+        <div style="font-size:12.5px;color:var(--muted);margin:0 0 8px">ระบบเชื่อมกับโปรเจกต์ <b style="font-family:var(--mono)">${escapeHtml(pid||'cs-workshop-6e4ff')}</b> ให้อัตโนมัติแล้ว — แก้ตรงนี้เฉพาะถ้าจะย้ายไปโปรเจกต์ Firebase อื่น</div>
+        <textarea id="fb_config_input" class="inp" style="width:100%;min-height:130px;font-family:var(--mono);font-size:12px">${escapeHtml(prettySaved)}</textarea>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-ghost" onclick="connectCloudFromInput()">🔗 ใช้ config นี้</button>
+          ${savedCfg?`<button class="btn btn-ghost" onclick="forgetCloudConfig()">↺ กลับเป็นค่าเริ่มต้น</button>`:''}
         </div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">ตั้งให้ตรงกันทุกเครื่องของ CS Ops Hub</div>
+        <div style="margin-top:16px;font-size:13px;color:var(--slate)">
+          <b>Collection prefix</b> (ชื่อชุดข้อมูล) — เก็บที่ <b style="font-family:var(--mono)">${escapeHtml(shipColl())}</b> / <b style="font-family:var(--mono)">${escapeHtml(metaColl())}</b>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <input id="coll_prefix_input" class="inp" style="max-width:200px;font-family:var(--mono)" value="${escapeHtml(_collPrefix)}" placeholder="cshub">
+            <button class="btn btn-ghost" onclick="saveCollPrefix()">บันทึก prefix</button>
+          </div>
+        </div>
+        <div style="margin-top:16px;font-size:13px;color:var(--slate);line-height:1.7">
+          <b>Firestore Rules</b> (ตั้งครั้งเดียวใน Firebase Console → Rules → Publish)
+          <pre style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;margin:6px 0 0">${escapeHtml(rules)}</pre>
+          <div style="background:var(--card2);border:1px solid var(--amber);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:10px">จำกัดเฉพาะอีเมลในทีม: เปลี่ยน <code>request.auth != null</code> เป็น <code>request.auth.token.email in ['a@gmail.com','b@gmail.com']</code> · อย่าลืมเพิ่มโดเมน GitHub Pages ใน Authentication → Settings → Authorized domains</div>
+        </div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-pad" style="border-bottom:1px solid var(--line)"><h3 style="font-family:var(--disp);font-size:14px;font-weight:700">วิธีตั้งค่าตั้งแต่ต้น</h3></div>
-      <div class="card-pad" style="font-size:13px;color:var(--slate);line-height:1.7">
-        <b>1) สร้าง Firebase project ใหม่ของ CS Ops Hub</b>
-        <ol style="margin:6px 0 12px 18px;padding:0">
-          <li>console.firebase.google.com → Add project (เช่นชื่อ <code>cs-ops-hub</code>)</li>
-          <li>Build → Firestore Database → Create database (region <code>asia-southeast1</code>)</li>
-          <li>Authentication → Sign-in method → เปิด <b>Google</b> provider</li>
-          <li>Project settings → Your apps → Web app (&lt;/&gt;) → คัดลอก <code>firebaseConfig</code></li>
-        </ol>
-        <b>2) Firestore Rules</b> (แท็บ Rules → วาง → Publish)
-        <pre style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;margin:6px 0 12px">${escapeHtml(rules)}</pre>
-        <div style="background:var(--card2);border:1px solid var(--amber);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--slate);margin-bottom:12px">เปิดให้เฉพาะคนที่ <b>ลงชื่อเข้าใช้</b> อยากจำกัดเฉพาะอีเมลในทีม เปลี่ยนเป็น <code>request.auth.token.email in ['a@gmail.com','b@gmail.com']</code></div>
-        <b>3) วาง config ด้านบน → เชื่อมต่อ → ลงชื่อเข้าใช้ด้วย Google</b>
-        <br><br><b>4) โฮสต์บน GitHub Pages</b>
-        <ol style="margin:6px 0 0 18px;padding:0">
-          <li>push ไฟล์นี้เป็น <code>index.html</code> ขึ้น repo → Settings → Pages → Deploy from branch → main → /(root)</li>
-          <li>Firebase → Authentication → Settings → Authorized domains → เพิ่มโดเมน GitHub Pages (เช่น <code>yourname.github.io</code>)</li>
-          <li>เปิดลิงก์ในทุกเครื่อง → ลงชื่อเข้าใช้ Google → ข้อมูลตรงกันทันที</li>
-        </ol>
-      </div>
-    </div>
+    </details>
   `;
   setCloudStatus(CLOUD.status);
 }
