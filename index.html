@@ -157,6 +157,7 @@ input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{o
 @media print{ .no-print{display:none !important} }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1164,7 +1165,7 @@ function rerenderGrid(){
 }
 
 function render_shipments(){
-  g('topbar_actions').innerHTML = `<button class="btn btn-ghost" onclick="openExportToSfpModal()">⬇ Export to Sea Freight Pro</button>`;
+  g('topbar_actions').innerHTML = `<button class="btn btn-ghost" onclick="exportShipmentsExcel()">📊 Export Excel</button> <button class="btn btn-ghost" onclick="openExportToSfpModal()">⬇ Export to Sea Freight Pro</button>`;
   const ae = document.activeElement;
   const activeId = (ae && ae.id === 'ship_search') ? ae.id : null;
   const activeCursor = activeId ? ae.selectionStart : null;
@@ -1785,7 +1786,37 @@ function cshubShipmentToSfpJob(s){
   };
 }
 
-let _exportSfpSelected = new Set();
+// ── Export the shipments grid to a real .xlsx (SheetJS) ──
+window.exportShipmentsExcel = function(){
+  if(!window.XLSX){ toast('⏳ กำลังโหลดตัวสร้าง Excel… ลองอีกครั้ง'); return; }
+  const etdKey = s=>{ const dt=parseFlexibleDate(s.etd); return (dt && !isNaN(dt)) ? dt.getTime() : Infinity; };
+  const list = shipments.filter(s=>!isBlankShipment(s)).slice().sort((a,b)=> etdKey(a)-etdKey(b));
+  if(!list.length){ toast('ไม่มีข้อมูลให้ export'); return; }
+  const cols = GRID_COLS;
+  const header = cols.map(c=> c.k==='__payment' ? 'Payment (AP/AR)' : c.label).concat(['Status']);
+  const rows = list.map(s=>{
+    const r = cols.map(c=>{
+      if(c.k==='__payment'){ const p=s.payment||{}; return `AP:${p.ap?'Paid':'-'} / AR:${p.ar?'Paid':'-'}`; }
+      if(c.type==='date') return s[c.k] ? toSfpDateDisplay(s[c.k]) : '';
+      return s[c.k]!=null ? String(s[c.k]) : '';
+    });
+    r.push(s.status||'');
+    return r;
+  });
+  const aoa = [header, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = header.map((h,i)=>{
+    let w = String(h).length;
+    rows.forEach(r=>{ const L = String(r[i]==null?'':r[i]).length; if(L>w) w=L; });
+    return { wch: Math.min(40, Math.max(10, w+2)) };
+  });
+  ws['!freeze'] = { xSplit:0, ySplit:1 }; // keep header row visible
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Shipments');
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `CS_Shipments_${today}.xlsx`);
+  toast('📊 Export Excel แล้ว ('+list.length+' รายการ)');
+};
 let _exportSfpFilterSale = '';
 let _exportSfpFilterFrom = '';
 let _exportSfpFilterTo = '';
