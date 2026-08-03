@@ -1959,7 +1959,7 @@ let wsBook = null;
 let wsActive = 0;
 let wsSel = null;          // {r1,c1,r2,c2}
 let wsFilters = {};        // { sheetIndex: { colIndex: [ค่าที่ติ๊กไว้] } } — เหมือน AutoFilter ใน Excel
-const LS_WS_BAK = 'cshub_worksheet_bak_v1';   // สำรองอัตโนมัติ 12 เวอร์ชันล่าสุด
+const LS_WS_BAK = 'cshub_worksheet_bak_v1';   // สำรองอัตโนมัติ 20 เวอร์ชันล่าสุด
 let wsUndo = [], wsRedo = [], wsTyping = null;
 let wsAnchor = null;
 let wsDragging = false;
@@ -2001,6 +2001,32 @@ function loadWorksheet(){
     wsBook = JSON.parse(JSON.stringify(WS_SEED));
   }
   if(!Array.isArray(wsBook.styles)) wsBook.styles = [];
+  // กู้อัตโนมัติ: ถ้าชีตจากไฟล์ต้นฉบับหายไป (โดนลบ) ให้ใส่กลับมาให้เอง
+  // โดยไม่แตะชีตที่แก้ไขไว้แล้ว
+  try{
+    const have = new Set(wsBook.sheets.map(x=>x.name));
+    const back = [];
+    WS_SEED.sheets.forEach(seed=>{
+      if(have.has(seed.name)) return;
+      const cp = JSON.parse(JSON.stringify(seed));
+      // สีของชีตต้นฉบับอ้างอิง WS_SEED.styles → ย้าย style เข้ามาในเล่มปัจจุบัน
+      const remap = new Map();
+      cp.rows.forEach(row=> row.forEach((cell,i)=>{
+        if(!Array.isArray(cell) || !cell[1]) return;
+        const old = cell[1];
+        if(!remap.has(old)){
+          const st = WS_SEED.styles[old-1] || {};
+          remap.set(old, wsStyleId(st.bg||null, st.fg||null, st.b));
+        }
+        row[i] = [cell[0], remap.get(old)];
+      }));
+      wsBook.sheets.push(cp); back.push(seed.name);
+    });
+    if(back.length){
+      try{ localStorage.setItem(LS_WORKSHEET, JSON.stringify(wsBook)); }catch(e){}
+      setTimeout(()=>toast('♻️ กู้ชีตที่หายกลับมาแล้ว: '+back.join(', ')), 800);
+    }
+  }catch(e){}
   if(wsActive >= wsBook.sheets.length) wsActive = 0;
 }
 function saveWorksheet(){
@@ -2024,8 +2050,25 @@ function wsApplySnap(js){
   if(wsActive >= wsBook.sheets.length) wsActive = 0;
   wsSel = null;
 }
+// ถ้า Undo ในหน่วยความจำหมด (เช่น เพิ่งรีเฟรชหน้า) ให้ถอยจากสำเนาอัตโนมัติแทน
+// → กด Ctrl/⌘+Z ย้อนได้เสมอ แม้ปิดแอปไปแล้วกลับมาเปิดใหม่
+function wsUndoFromBackup(){
+  let list = [];
+  try{ list = JSON.parse(localStorage.getItem(LS_WS_BAK)||'[]'); }catch(e){ return false; }
+  const cur = wsSnap();
+  while(list.length && list[0].d === cur) list.shift();
+  if(!list.length) return false;
+  const b = list.shift();
+  try{ localStorage.setItem(LS_WS_BAK, JSON.stringify(list)); }catch(e){}
+  wsRedo.push(cur);
+  wsApplySnap(b.d);
+  return true;
+}
 window.wsUndoAct = function(){
-  if(!wsUndo.length) return toast('ไม่มีอะไรให้ย้อนกลับแล้ว');
+  if(!wsUndo.length){
+    if(wsUndoFromBackup()){ saveWorksheet(); render_worksheet(); toast('↩ ย้อนกลับ (จากสำเนาอัตโนมัติ)'); return; }
+    return toast('ไม่มีอะไรให้ย้อนกลับแล้ว — ลองปุ่ม 💾 กู้คืน');
+  }
   wsRedo.push(wsSnap());
   wsApplySnap(wsUndo.pop());
   saveWorksheet(); render_worksheet(); toast('↩ ย้อนกลับแล้ว');
@@ -2043,7 +2086,7 @@ function wsBackup(){
   const snap = wsSnap();
   if(list.length && list[0].d === snap) return;          // ไม่มีอะไรเปลี่ยน
   list.unshift({t:Date.now(), d:snap});
-  list = list.slice(0, 12);
+  list = list.slice(0, 20);
   try{ localStorage.setItem(LS_WS_BAK, JSON.stringify(list)); }
   catch(e){ try{ localStorage.setItem(LS_WS_BAK, JSON.stringify(list.slice(0,4))); }catch(e2){} }
 }
@@ -2532,6 +2575,7 @@ function wsStartResize(e){
   const cols = g('ws_tbl').querySelectorAll('colgroup col');
   const start = cols[c+1].style.width ? parseInt(cols[c+1].style.width) : 110;
   e.preventDefault();
+  wsPush();
   const mv = ev=>{ const w = Math.max(38, start + (ev.clientX-startX)); cols[c+1].style.width = w+'px'; };
   const up = ev=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
     sh.w = sh.w||[]; sh.w[c] = Math.max(38, start + (ev.clientX-startX)); saveWorksheet(); };
@@ -2549,6 +2593,7 @@ window.wsAddSheet = function(){
 window.wsRenameSheet = function(i){
   const name = prompt('เปลี่ยนชื่อชีต:', wsBook.sheets[i].name);
   if(!name) return;
+  wsPush();
   wsBook.sheets[i].name = name.trim(); saveWorksheet(); render_worksheet();
 };
 window.wsDeleteSheet = function(){
@@ -2648,6 +2693,12 @@ window.wsShortcutHelp = function(){
       </div>
     </div>`);
 };
+// อ่านปุ่มจาก "ตำแหน่งปุ่มจริง" (e.code) ไม่ใช่ตัวอักษรที่พิมพ์ออกมา
+// เพราะถ้าสลับแป้นเป็นภาษาไทย ปุ่ม Z จะได้ e.key = 'ผ' ทำให้ปุ่มลัดไม่ทำงาน
+function wsKey(e){
+  if(e.code && /^Key[A-Z]$/.test(e.code)) return e.code.slice(3).toLowerCase();
+  return (e.key||'').toLowerCase();
+}
 // ตัวรับปุ่มลัดระดับหน้า — ทำงานเฉพาะตอนอยู่หน้า Work Sheet
 document.addEventListener('keydown', function(e){
   const pg = g('page-worksheet');
@@ -2657,14 +2708,16 @@ document.addEventListener('keydown', function(e){
   if(e.key==='Escape'){ g('ws_filter_pop')?.remove(); if(e.target.blur) e.target.blur(); return; }
   if(inInput && !(mod && e.key.toLowerCase()==='s')) return;
 
-  if(mod && !e.shiftKey && e.key.toLowerCase()==='z'){ e.preventDefault(); return wsUndoAct(); }
-  if(mod && (e.key.toLowerCase()==='y' || (e.shiftKey && e.key.toLowerCase()==='z'))){ e.preventDefault(); return wsRedoAct(); }
-  if(mod && e.key.toLowerCase()==='a'){ e.preventDefault(); return wsSelectAll(); }
-  if(mod && e.key.toLowerCase()==='d'){ e.preventDefault(); return wsFillDown(); }
-  if(mod && e.key.toLowerCase()==='b'){ e.preventDefault(); return wsToggleBold(); }
-  if(mod && e.key.toLowerCase()==='f'){ e.preventDefault(); g('ws_find')?.focus(); return; }
-  if(mod && e.key.toLowerCase()==='s'){ e.preventDefault(); saveWorksheet(); return toast('💾 บันทึกแล้ว'); }
-  if(mod && e.shiftKey && e.key.toLowerCase()==='l'){ e.preventDefault(); return wsClearFilters(); }
+  const kk = wsKey(e);
+  if(mod && !e.shiftKey && kk==='z'){ e.preventDefault(); return window.wsUndoAct(); }
+  if(mod && (kk==='y' || (e.shiftKey && kk==='z'))){ e.preventDefault(); return window.wsRedoAct(); }
+  if(mod && kk==='a'){ e.preventDefault(); return window.wsSelectAll(); }
+  if(mod && kk==='d'){ e.preventDefault(); return window.wsFillDown(); }
+  if(mod && kk==='b'){ e.preventDefault(); return window.wsToggleBold(); }
+  if(mod && kk==='f'){ e.preventDefault(); g('ws_find')?.focus(); return; }
+  if(mod && kk==='s'){ e.preventDefault(); saveWorksheet(); return toast('💾 บันทึกแล้ว'); }
+  if(mod && e.shiftKey && kk==='l'){ e.preventDefault(); return window.wsClearFilters(); }
+  if(mod && (kk==='c' || kk==='x')){ return; }   // ปล่อยให้ event copy/cut จัดการ
 
   const td = e.target.closest && e.target.closest('td.ws-c');
   const R = wsRange();
