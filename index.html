@@ -183,6 +183,24 @@ input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{o
   padding:5px 12px;font-size:11.5px;font-weight:600;border-radius:0 0 6px 6px;cursor:pointer}
 .ws-tab.on{background:#fff;border-top-color:var(--teal);color:var(--teal-dk)}
 .ws-tab.add{font-weight:700;color:var(--muted);padding:5px 9px}
+
+.ws-c.sel{background-image:linear-gradient(rgba(31,111,235,.16),rgba(31,111,235,.16));
+  outline:1px solid rgba(31,111,235,.45);outline-offset:-1px}
+.ws-c.act{outline:2px solid #1f6feb;outline-offset:-2px;background-image:none}
+.ws-fbtn{display:inline-block;margin-left:3px;padding:0 2px;font-size:9px;color:#8795a5;cursor:pointer;
+  border:1px solid transparent;border-radius:3px;background:#fff}
+.ws-fbtn:hover{background:var(--teal-bg);color:var(--teal-dk);border-color:var(--teal)}
+.ws-fbtn.on{background:var(--teal);color:#fff;border-color:var(--teal-dk)}
+.ws-colh.filtered{background:#dff0ef !important;color:var(--teal-dk)}
+.ws-pop{position:fixed;z-index:1200;width:250px;background:#fff;border:1px solid var(--line2);
+  border-radius:8px;box-shadow:0 8px 28px rgba(19,32,46,.18);padding:8px}
+.ws-pop-h{font-size:11px;font-weight:700;color:var(--slate);margin-bottom:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-pop-list{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px}
+.ws-pop-i{display:flex;gap:6px;align-items:center;font-size:11.5px;padding:2px 4px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-pop-i:hover{background:var(--card2)}
+.ws-pop-f{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1940,6 +1958,7 @@ const WS_PALETTE = [
 let wsBook = null;
 let wsActive = 0;
 let wsSel = null;          // {r1,c1,r2,c2}
+let wsFilters = {};        // { sheetIndex: { colIndex: [ค่าที่ติ๊กไว้] } } — เหมือน AutoFilter ใน Excel
 let wsAnchor = null;
 let wsDragging = false;
 let wsSaveTimer = null;
@@ -1989,6 +2008,178 @@ function saveWorksheet(){
 }
 function wsScheduleSave(){ clearTimeout(wsSaveTimer); wsSaveTimer = setTimeout(saveWorksheet, 400); }
 
+// ── AutoFilter (เหมือน Excel) ───────────────────────────
+// แถวที่ 1 ของแต่ละชีต = หัวตาราง · กรองจากแถวที่ 2 ลงไป
+function wsHiddenRows(sh){
+  const F = wsFilters[wsActive];
+  const hide = new Set();
+  if(!F || !Object.keys(F).length) return hide;
+  for(let r=1; r<sh.rows.length; r++){
+    for(const c in F){
+      const allow = F[c];
+      if(!allow) continue;
+      const v = wsCell(sh.rows[r]||[], +c)[0];
+      if(!allow.includes(v)){ hide.add(r); break; }
+    }
+  }
+  return hide;
+}
+function wsColValues(sh, c){
+  const seen = new Map();
+  for(let r=1; r<sh.rows.length; r++){
+    const v = wsCell(sh.rows[r]||[], c)[0];
+    seen.set(v, (seen.get(v)||0)+1);
+  }
+  const MON = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const asDate = v=>{ const m = /^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/.exec(String(v).trim());
+    if(!m) return null; const mo = MON[m[2].toLowerCase()]; if(mo==null) return null;
+    const y = +m[3]; return new Date(y<100?2000+y:y, mo, +m[1]).getTime(); };
+  const keys = [...seen.keys()];
+  const allDates = keys.filter(v=>v!=='').every(v=>asDate(v)!==null) && keys.some(v=>v!=='');
+  return keys.sort((a,b)=>{
+    if(a==='') return 1; if(b==='') return -1;
+    if(allDates) return asDate(a)-asDate(b);           // คอลัมน์วันที่ → เรียงตามวันจริง
+    return String(a).localeCompare(String(b), 'th', {numeric:true});
+  });
+}
+window.wsOpenFilter = function(c, anchorEl){
+  g('ws_filter_pop')?.remove();
+  const sh = wsBook.sheets[wsActive];
+  const name = wsCell(sh.rows[0]||[], c)[0] || wsColLetter(c);
+  const vals = wsColValues(sh, c);
+  const F = wsFilters[wsActive] || {};
+  const cur = F[c] || null;
+  const pop = document.createElement('div');
+  pop.id = 'ws_filter_pop'; pop.className = 'ws-pop';
+  pop.innerHTML = `
+    <div class="ws-pop-h">${escapeHtml(name)}</div>
+    <input class="inp" id="ws_fq" placeholder="ค้นหา…" style="height:28px;margin-bottom:6px" oninput="wsFilterSearch(this.value)">
+    <label class="ws-pop-i" style="font-weight:700"><input type="checkbox" id="ws_fall" ${cur?'':'checked'} onchange="wsFilterAll(this.checked)"> (เลือกทั้งหมด)</label>
+    <div class="ws-pop-list" id="ws_flist">
+      ${vals.map((v,i)=>`<label class="ws-pop-i" data-v="${escapeHtml(v)}"><input type="checkbox" value="${escapeHtml(v)}" ${(!cur||cur.includes(v))?'checked':''}> ${v===''?'<i>(ว่าง)</i>':escapeHtml(v)}</label>`).join('')}
+    </div>
+    <div class="ws-pop-f">
+      <button class="btn btn-ghost btn-sm" onclick="wsFilterClear(${c})">ล้าง</button>
+      <button class="btn btn-primary btn-sm" onclick="wsFilterApply(${c})">ตกลง</button>
+    </div>`;
+  document.body.appendChild(pop);
+  const b = anchorEl.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(window.innerWidth-268, b.left-120))+'px';
+  pop.style.top  = (b.bottom+4)+'px';
+  setTimeout(()=>{
+    document.addEventListener('mousedown', wsFilterOutside);
+  },0);
+};
+function wsFilterOutside(e){
+  const pop = g('ws_filter_pop'); if(!pop) return;
+  if(pop.contains(e.target) || e.target.classList.contains('ws-fbtn')) return;
+  pop.remove(); document.removeEventListener('mousedown', wsFilterOutside);
+}
+window.wsFilterSearch = function(q){
+  const t = (q||'').toLowerCase();
+  g('ws_flist').querySelectorAll('.ws-pop-i').forEach(l=>{
+    l.style.display = (l.dataset.v||'').toLowerCase().includes(t) ? '' : 'none';
+  });
+};
+window.wsFilterAll = function(on){
+  g('ws_flist').querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    if(cb.closest('.ws-pop-i').style.display!=='none') cb.checked = on;
+  });
+};
+window.wsFilterApply = function(c){
+  const boxes = [...g('ws_flist').querySelectorAll('input[type=checkbox]')];
+  const picked = boxes.filter(b=>b.checked).map(b=>b.value);
+  wsFilters[wsActive] = wsFilters[wsActive] || {};
+  if(picked.length === boxes.length) delete wsFilters[wsActive][c];
+  else wsFilters[wsActive][c] = picked;
+  g('ws_filter_pop')?.remove();
+  document.removeEventListener('mousedown', wsFilterOutside);
+  render_worksheet();
+};
+window.wsFilterClear = function(c){
+  if(wsFilters[wsActive]) delete wsFilters[wsActive][c];
+  g('ws_filter_pop')?.remove();
+  document.removeEventListener('mousedown', wsFilterOutside);
+  render_worksheet();
+};
+window.wsClearFilters = function(){
+  wsFilters[wsActive] = {};
+  render_worksheet();
+  toast('ล้างฟิลเตอร์แล้ว');
+};
+
+// ── Copy / Cut / Paste แบบ Excel ────────────────────────
+function wsSelText(){
+  const R = wsRange(); if(!R) return '';
+  const sh = wsBook.sheets[wsActive];
+  const hidden = wsHiddenRows(sh);
+  const lines = [];
+  for(let r=R.r1;r<=R.r2;r++){
+    if(hidden.has(r)) continue;               // แถวที่ถูกกรองอยู่ ไม่คัดลอกไปด้วย
+    const cells = [];
+    for(let c=R.c1;c<=R.c2;c++) cells.push(wsCell(sh.rows[r]||[], c)[0]);
+    lines.push(cells.join('\t'));
+  }
+  return lines.join('\n');
+}
+window.wsCopySel = function(){
+  const txt = wsSelText();
+  if(!txt) return toast('เลือกช่องก่อนครับ');
+  const done = ()=> toast('⧉ คัดลอกแล้ว — วางใน Excel ได้เลย');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, ()=>wsCopyFallback(txt,done));
+  } else wsCopyFallback(txt, done);
+};
+function wsCopyFallback(txt, done){
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){ toast('❌ คัดลอกไม่สำเร็จ'); }
+  ta.remove();
+}
+function wsPasteText(txt){
+  const R = wsRange(); if(!R) return;
+  const sh = wsBook.sheets[wsActive];
+  const lines = String(txt).replace(/\r/g,'').replace(/\n$/,'').split('\n');
+  lines.forEach((line, i)=>{
+    line.split('\t').forEach((v, j)=>{
+      const r = R.r1+i, c = R.c1+j;
+      const [,sid] = wsCell(sh.rows[r]||[], c);
+      wsSet(sh, r, c, v.trim(), sid);          // วางทับค่า แต่คงสีเดิมของช่องไว้
+    });
+  });
+  wsSel = {r1:R.r1, c1:R.c1, r2:R.r1+lines.length-1, c2:R.c1+(lines[0].split('\t').length-1)};
+  saveWorksheet(); render_worksheet();
+  toast('📋 วาง '+lines.length+' แถวแล้ว');
+}
+// ตัวจัดการระดับหน้า — ทำงานเฉพาะตอนอยู่หน้า Work Sheet และเลือกช่องไว้
+function wsClipboardActive(){
+  const pg = g('page-worksheet');
+  if(!pg || !pg.classList.contains('active') || !wsSel) return false;
+  const sel = window.getSelection();
+  const multi = (wsSel.r1!==wsSel.r2 || wsSel.c1!==wsSel.c2);
+  return multi || !sel || sel.isCollapsed || sel.toString()==='';
+}
+document.addEventListener('copy', e=>{
+  if(!wsClipboardActive()) return;
+  const txt = wsSelText(); if(!txt) return;
+  e.preventDefault(); e.clipboardData.setData('text/plain', txt);
+});
+document.addEventListener('cut', e=>{
+  if(!wsClipboardActive()) return;
+  const txt = wsSelText(); if(!txt) return;
+  e.preventDefault(); e.clipboardData.setData('text/plain', txt);
+  wsClearCells();
+});
+document.addEventListener('paste', e=>{
+  const pg = g('page-worksheet');
+  if(!pg || !pg.classList.contains('active') || !wsSel) return;
+  const txt = (e.clipboardData||window.clipboardData).getData('text');
+  if(!txt || txt.indexOf('\t')<0 && txt.indexOf('\n')<0) return; // ค่าเดียว = ให้พิมพ์ลงช่องตามปกติ
+  e.preventDefault();
+  wsPasteText(txt);
+});
+
 // ── render ──────────────────────────────────────────────
 function render_worksheet(){
   if(!wsBook) loadWorksheet();
@@ -2000,21 +2191,29 @@ function render_worksheet(){
   const w = sh.w || [];
   const colgroup = '<col style="width:44px">' + Array.from({length:nCols}, (_,c)=>
       `<col style="width:${Math.max(38, w[c]||110)}px">`).join('');
-  const head = '<th class="ws-corner"></th>' + Array.from({length:nCols}, (_,c)=>
-      `<th class="ws-colh" data-c="${c}">${wsColLetter(c)}<span class="ws-grip" data-c="${c}"></span></th>`).join('');
+  const F = wsFilters[wsActive] || {};
+  const hdr = sh.rows[0] || [];
+  const head = '<th class="ws-corner"></th>' + Array.from({length:nCols}, (_,c)=>{
+      const name = wsCell(hdr, c)[0];
+      const on = !!F[c];
+      return `<th class="ws-colh ${on?'filtered':''}" data-c="${c}" title="${escapeHtml(name||wsColLetter(c))}">`+
+             `${wsColLetter(c)}<span class="ws-fbtn ${on?'on':''}" data-fc="${c}">▾</span>`+
+             `<span class="ws-grip" data-c="${c}"></span></th>`;
+    }).join('');
+  const hidden = wsHiddenRows(sh);
   const body = sh.rows.map((row, r)=>{
     const tds = Array.from({length:nCols}, (_,c)=>{
       const [txt, sid] = wsCell(row, c);
       const st = wsStyle(sid);
       let style = '';
       if(st){
-        if(st.bg) style += 'background:#'+st.bg+';';
+        if(st.bg) style += 'background-color:#'+st.bg+';';
         if(st.fg) style += 'color:#'+st.fg+';';
         if(st.b)  style += 'font-weight:700;';
       }
       return `<td class="ws-c" data-r="${r}" data-c="${c}" style="${style}" contenteditable="true" spellcheck="false">${escapeHtml(txt)}</td>`;
     }).join('');
-    return `<tr><th class="ws-rowh" data-r="${r}">${r+1}</th>${tds}</tr>`;
+    return `<tr${hidden.has(r)?' style="display:none"':''}><th class="ws-rowh" data-r="${r}">${r+1}</th>${tds}</tr>`;
   }).join('');
 
   const swatches = WS_PALETTE.map(p=>
@@ -2040,6 +2239,8 @@ function render_worksheet(){
         <button class="btn btn-ghost btn-sm" onclick="wsDeleteCol()">ลบคอลัมน์</button>
       </div>
       <div class="ws-grp">
+        <button class="btn btn-ghost btn-sm" onclick="wsClearFilters()">✕ ล้างฟิลเตอร์</button>
+        <button class="btn btn-ghost btn-sm" onclick="wsCopySel()">⧉ คัดลอก</button>
         <button class="btn btn-ghost btn-sm" onclick="wsOpenShipment()">🔗 เปิด Shipment ของแถวนี้</button>
       </div>
       <div class="ws-grp" style="margin-left:auto">
@@ -2062,7 +2263,8 @@ function render_worksheet(){
 function wsInfo(){
   const sh = wsBook.sheets[wsActive];
   const el = g('ws_info'); if(!el) return;
-  el.textContent = sh.rows.length+' แถว × '+wsCols(sh)+' คอลัมน์';
+  const hid = wsHiddenRows(sh).size;
+  el.textContent = (sh.rows.length-1-hid)+'/'+(sh.rows.length-1)+' แถว × '+wsCols(sh)+' คอลัมน์'+(hid?' · กรองอยู่':'');
 }
 window.wsGoSheet = function(i){ wsActive=i; wsSel=null; render_worksheet(); };
 
@@ -2073,6 +2275,7 @@ function wsBindGrid(){
     const td = e.target.closest('td.ws-c');
     const rh = e.target.closest('th.ws-rowh');
     const ch = e.target.closest('th.ws-colh');
+    if(e.target.classList.contains('ws-fbtn')){ e.preventDefault(); e.stopPropagation(); wsOpenFilter(+e.target.dataset.fc, e.target); return; }
     if(e.target.classList.contains('ws-grip')){ wsStartResize(e); return; }
     const sh = wsBook.sheets[wsActive];
     if(rh){ const r=+rh.dataset.r; wsSel={r1:r,c1:0,r2:r,c2:wsCols(sh)-1}; wsAnchor={r,c:0}; wsPaintSel(); return; }
@@ -2105,6 +2308,13 @@ function wsBindGrid(){
     const move=(dr,dc)=>{ const n=tbl.querySelector(`td.ws-c[data-r="${r+dr}"][data-c="${c+dc}"]`);
       if(n){ e.preventDefault(); n.focus(); wsAnchor={r:r+dr,c:c+dc}; wsSel={r1:r+dr,c1:c+dc,r2:r+dr,c2:c+dc}; wsPaintSel();
              const sel=window.getSelection(); sel.selectAllChildren(n); sel.collapseToEnd(); } };
+    if(e.shiftKey && e.key.startsWith('Arrow')){   // Shift+ลูกศร = ขยายพื้นที่เลือก เหมือน Excel
+      e.preventDefault();
+      const d = {ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];
+      if(!d || !wsSel) return;
+      wsSel = {r1:wsAnchor.r, c1:wsAnchor.c, r2:Math.max(0,wsSel.r2+d[0]), c2:Math.max(0,wsSel.c2+d[1])};
+      wsPaintSel(); return;
+    }
     if(e.key==='Enter' && !e.shiftKey) return move(1,0);
     if(e.key==='ArrowDown') return move(1,0);
     if(e.key==='ArrowUp')   return move(-1,0);
@@ -2120,11 +2330,21 @@ function wsRange(){
 }
 function wsPaintSel(){
   const tbl = g('ws_tbl'); if(!tbl) return;
-  tbl.querySelectorAll('td.ws-c.sel').forEach(td=>td.classList.remove('sel'));
+  tbl.querySelectorAll('td.ws-c.sel,td.ws-c.act').forEach(td=>td.classList.remove('sel','act'));
   const R = wsRange(); if(!R) return;
   for(let r=R.r1;r<=R.r2;r++) for(let c=R.c1;c<=R.c2;c++){
-    tbl.querySelector(`td.ws-c[data-r="${r}"][data-c="${c}"]`)?.classList.add('sel');
+    const td = tbl.querySelector(`td.ws-c[data-r="${r}"][data-c="${c}"]`);
+    if(!td) continue;
+    td.classList.add('sel');
+    if(r===R.r1 && c===R.c1) td.classList.add('act');
   }
+  wsInfoSel(R);
+}
+function wsInfoSel(R){
+  const el = g('ws_info'); if(!el) return;
+  const n = (R.r2-R.r1+1)*(R.c2-R.c1+1);
+  if(n>1) el.textContent = 'เลือก '+(R.r2-R.r1+1)+' แถว × '+(R.c2-R.c1+1)+' คอลัมน์ — Ctrl/⌘+C คัดลอกได้เลย';
+  else wsInfo();
 }
 function wsEachSelected(fn){
   const R = wsRange(); if(!R){ toast('เลือกช่องก่อนครับ'); return false; }
