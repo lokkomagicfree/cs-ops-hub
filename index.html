@@ -155,6 +155,34 @@ input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{o
 .apar-badge.on{background:var(--green-bg);color:var(--green);border-color:var(--green)}
 
 @media print{ .no-print{display:none !important} }
+
+/* ── Work Sheet (Excel-like grid) ───────────────────── */
+.ws-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:8px 10px;margin-bottom:8px;box-shadow:var(--shadow)}
+.ws-grp{display:flex;gap:4px;align-items:center;padding-right:10px;border-right:1px solid var(--line)}
+.ws-grp:last-child{border-right:0;padding-right:0}
+.ws-sw{width:20px;height:20px;border:1px solid var(--line2);border-radius:4px;cursor:pointer;padding:0}
+.ws-sw:hover{outline:2px solid var(--teal);outline-offset:1px}
+.btn-sm{padding:4px 8px !important;font-size:11px !important;height:28px}
+.ws-info{font-size:11px;color:var(--muted);white-space:nowrap}
+.ws-wrap{overflow:auto;max-height:calc(100vh - 260px);border:1px solid var(--line2);border-radius:6px;background:#fff}
+.ws-tbl{border-collapse:separate;border-spacing:0;font-size:11.5px;font-family:var(--body);table-layout:fixed}
+.ws-tbl th,.ws-tbl td{border-right:1px solid #d6dbe1;border-bottom:1px solid #d6dbe1;padding:2px 5px;height:21px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ws-tbl thead th{position:sticky;top:0;z-index:3;background:#eef1f5;font-weight:600;color:#4a5a6b;text-align:center;font-size:10.5px}
+.ws-corner{position:sticky;left:0;z-index:4 !important;background:#e6eaf0 !important}
+.ws-rowh{position:sticky;left:0;z-index:2;background:#eef1f5;color:#7a8a9c;text-align:center;font-size:10px;font-weight:600}
+.ws-colh{position:relative;user-select:none}
+.ws-grip{position:absolute;right:-3px;top:0;width:6px;height:100%;cursor:col-resize}
+.ws-c{background:#fff;outline:none;cursor:cell}
+.ws-c:focus{box-shadow:inset 0 0 0 2px var(--teal)}
+.ws-c.sel{box-shadow:inset 0 0 0 9999px rgba(14,124,123,.10)}
+.ws-c.hit{outline:2px solid var(--amber);outline-offset:-2px}
+.ws-tabs{display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.ws-tab{border:1px solid var(--line2);border-top:2px solid transparent;background:var(--card2);color:var(--slate);
+  padding:5px 12px;font-size:11.5px;font-weight:600;border-radius:0 0 6px 6px;cursor:pointer}
+.ws-tab.on{background:#fff;border-top-color:var(--teal);color:var(--teal-dk)}
+.ws-tab.add{font-weight:700;color:var(--muted);padding:5px 9px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -172,6 +200,7 @@ input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{o
       <div class="nav-section">Shipments</div>
       <button class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')"><span class="ic">▦</span>Dashboard</button>
       <button class="nav-item" data-page="shipments" onclick="goPage('shipments')"><span class="ic">📦</span>Shipments</button>
+      <button class="nav-item" data-page="worksheet" onclick="goPage('worksheet')"><span class="ic">📗</span>Work Sheet</button>
 
       <div class="nav-section">Documents</div>
       <button class="nav-item" data-page="documents" onclick="goPage('documents')"><span class="ic">📄</span>Documents</button>
@@ -200,6 +229,7 @@ input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{o
 
       <!-- ── PAGE: Shipments ── -->
       <div class="page" id="page-shipments"></div>
+      <div class="page" id="page-worksheet"></div>
       <div class="page" id="page-documents"></div>
       <div class="page" id="page-cloud"></div>
 
@@ -239,6 +269,7 @@ function g(id){ return document.getElementById(id); }
 const PAGE_META = {
   dashboard: {title:'Dashboard', sub:'Overview of all shipments and pending actions'},
   shipments: {title:'Shipments', sub:'All bookings, organized by month'},
+  worksheet: {title:'Work Sheet', sub:'ตารางงาน CS แบบ Excel — แก้ไข ระบายสี แทรกแถว ได้ในหน้านี้เลย'},
   documents: {title:'Documents', sub:'Confirmed bookings received from CS — same data, with document names'},
   cloud:     {title:'Cloud Sync', sub:'เชื่อม Firestore เพื่อแชร์ข้อมูลแบบเรียลไทม์ระหว่างทีม'},
   terminals: {title:'Terminal / Depot Library', sub:'Saved pickup and turn-in locations for reuse'},
@@ -272,6 +303,7 @@ let checklistTemplates = [];
 let ports = [];
 
 function loadAll(){
+  try{ loadWorksheet(); }catch(e){}
   try{ shipments = JSON.parse(localStorage.getItem(LS_SHIPMENTS)||'[]'); }catch(e){ shipments=[]; }
   try{ terminals = JSON.parse(localStorage.getItem(LS_TERMINALS)||'[]'); }catch(e){ terminals=[]; }
   try{ checklistTemplates = JSON.parse(localStorage.getItem(LS_CHECKLISTS)||'[]'); }catch(e){ checklistTemplates=[]; }
@@ -1886,6 +1918,436 @@ window.exportShipmentsExcel = function(){
   const today = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `CS_Shipments_${today}.xlsx`);
   toast('📊 Export Excel แล้ว ('+list.length+' รายการ)');
+};
+
+const WS_SEED = {"styles":[{"bg":"00B0F0","fg":null,"b":0},{"bg":"FF0000","fg":null,"b":0},{"bg":"FFFF00","fg":null,"b":0},{"bg":"FFC000","fg":null,"b":0},{"bg":"00B050","fg":null,"b":0},{"bg":"92D050","fg":null,"b":0},{"bg":"FFFF00","fg":"FF0000","b":0},{"bg":"CCD4DE","fg":null,"b":1},{"bg":null,"fg":null,"b":1}],"sheets":[{"name":"P'PAE","w":[88,91,64,69,62,86,103,123,114,111,86,120],"rows":[[["CY-RTN"],["SI&VGM"],["BL"],["ETD"],["AR"],["AP"],["PRE-ALERT"],["BOOKING NO."],["JOB NO."],["HBL"],["MBL"],["REQ"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503678560"],["WLCLKR260623433"],["WLC60623433"],["COSU6503678560"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503677930"],["WLCLKR260623404"],["WLC60623404"],["COSU6503677930"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503677650"],["WLCLKR260623133"],["WLC60623133"],["COSU6503677650"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503677270"],["WLCLKR260623115"],["WLC60623115"],["COSU6503677270"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503676990"],["WLCLKR260623101"],["WLC60623101"],["COSU6503676990"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503674590"],["WLCLKR260623015"],["WLC60623015"],["COSU6503674590"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503451760"],["WLCLKR260622895"],["WLC60622895"],["COSU6503451760"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503676820"],["WLCLKR260620421"],["WLC60620421"],["COSU6503676820"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503676160"],["WLCLKR260619979"],["WLC60619979"],["COSU6503676160"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503676580"],["WLCLKR260619840"],["WLC60619840"],["COSU6503676580"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["20-Jun-26"],["x"],["x",1],["x"],["6503451870"],["WLCLCH260622970"],["WLC60622970"],["COSU6503451870"]],[["14-Jun-26"],["14-Jun-26"],["14-Jun-26"],["21-Jun-26"],["x"],["x",1],["x"],["6504372100"],["WLCLCH260626638"],["WLC60626638"],["COSU6504372100"]],[["17-Jun-26"],["17-Jun-26"],["17-Jun-26"],["23-Jun-26"],["x"],["x",1],["x"],["6503451810"],["WLCLCH260626767"],["WLC60626767"],["COSU6503451810"]],[["17-Jun-26"],["17-Jun-26"],["17-Jun-26"],["23-Jun-26"],["x"],["x",1],["x"],["6503451320"],["WLCLCH260626724"],["WLC60626724"],["COSU6503451320"]],[["17-Jun-26"],["17-Jun-26"],["17-Jun-26"],["23-Jun-26"],["x"],["x",1],["x"],["6504218500"],["WLCLCH260626589"]],[["26-Jun-26"],["26-Jun-26"],["29-Jun-26"],["29-Jun-26"],["x"],["x"],["x"],["BKKGF6063400"],["WLCLKR260626859"],0,0,["AMEND FEE"]],[["29-Jun-26"],["29-Jun-26"],["30-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["035GX39363"],["WLCLKR260705786"],["WLC60705786"]],[["29-Jun-26"],["29-Jun-26"],["30-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["035GX39365"],["WLCLKR260705788"],["WLC60705788"]],[["29-Jun-26"],["29-Jun-26"],["30-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["035GX39367"],["WLCLKR260705790"],["WLC60705790"]],[["29-Jun-26"],["29-Jun-26"],["30-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["035GX39368"],["WLCLKR260705791"],["WLC60705791"]],[["29-Jun-26"],["29-Jun-26"],["30-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["035GX39369"],["WLCLKR260705792"],["WLC60705792"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504746370"],["WLCLKR260705767"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504481310"],["WLCLKR260705774"]],[["29-Jun-26"],["29-Jun-26"],["3-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504746530"],["WLCLKR260705775"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504821930"],["WLCLKR260705776"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504747360"],["WLCLKR260705777"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504776420"],["WLCLCH260705778"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504776440"],["WLCLCH260705781"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["4-Jul-26"],["x"],["x",1],["x"],["6504776430"],["WLCLCH260705779"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["5-Jul-26"],["x"],["x",1],["x"],["6504978940"],["WLCLKR260707371"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["5-Jul-26"],["x"],["x",1],["x"],["6504979050"],["WLCLKR260707378"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["5-Jul-26"],["x"],["x",1],["x"],["6504978880"],["WLCLKR260707379"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["5-Jul-26"],["x"],["x",1],["x"],["6505290462"],["WLCLKR260709310"]],[["3-Jul-26"],["3-Jul-26"],["6-Jul-26"],["8-Jul-26"],["x"],["x",1],["x"],["6505942390"],["WLCLKR260708239"]],[["3-Jul-26"],["3-Jul-26"],["9-Jul-26"],["11-Jul-26"],["x"],["x",1],["x"],["6505218540"],["WLCLKR260709160"],0,0,["AMS"]],[["3-Jul-26"],["3-Jul-26"],["9-Jul-26"],["11-Jul-26"],["x"],["x",1],["x"],["6505216990"],["WLCLKR260709269"],0,0,["AMS"]],[["3-Jul-26"],["3-Jul-26"],["9-Jul-26"],["11-Jul-26"],["x"],["x",1],["x"],["6505218970"],["WLCLKR260709288"],0,0,["AMS"]],[["8-Jul-26"],["8-Jul-26"],["9-Jul-26"],["14-Jul-26"],["x"],["x",1],["CBM",2],["6506567600"],["WLCLCH260715575"]],[["8-Jul-26"],["8-Jul-26"],["9-Jul-26"],["14-Jul-26"],["x"],["x",1],["GCL",3],["6506534032"],["WLCLCH260715408"],0,0,["SBKK00528575"]],[["8-Jul-26"],["8-Jul-26"],["9-Jul-26"],["14-Jul-26"],["x"],["x",1],["GCL",3],["6506534033"],["WLCLCH260715571"],0,0,["SBKK00528574"]],[["14-Jul-26"],["14-Jul-26"],["20-Jul-26"],["21-Jul-26"],["x"],["22-Jul-26",1],["OBL",4],["6506723750"],["WLCLKR260716677"],0,0,["CHIWADI OBL first"]],[["15-Jul-26"],["15-Jul-26"],["20-Jul-26"],["21-Jul-26"],["x",1],["22-Jul-26",1],["CBM",2],["6506534034"],["WLCLCH260719843"],0,0,["CANCEL"]],[["15-Jul-26"],["15-Jul-26"],["20-Jul-26"],["24-Jul-26"],["x",1],["24-Jul-26",5],["STORAGE CHARGE",4],["6506487904"],["WLCLCH260719755"],0,0,["SBKK00528579"]],[["15-Jul-26"],["15-Jul-26"],["21-Jul-26"],["27-Jul-26"],["x",1],["27-Jul-26",6],["DEM",4],["BKKGL5129300"],["WLCLCH260719170"],0,0,["SBKK00529503"]],[["20-Jul-26"],["20-Jul-26"],["24-Jul-26"],["25-Jul-26"],["27-Jul-26",6],["27-Jul-26",5],["CBM",2],["6506534030"],["WLCLCH260721851"]],[["22-Jul-26"],["23-Jul-26"],["27-Jul-26"],["28-Jul-26"],["30-Jul-26",6],["30-Jul-26",5],["",4],["6508140550"],["WLCLKR260723564"],0,0,["SBKK00529021"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26"],["4-Aug-26",3],["",3],["",3],["LCH",3],["035GX46819"],["WLCLCH260723575"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26"],["4-Aug-26",3],["",3],["",3],["",3],["035GX46638"],["WLCLKR260723590"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26"],["4-Aug-26",3],["",3],["",3],["",3],["035GX46639"],["WLCLKR260723596"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26",3],["4-Aug-26",3],["",3],["",3],["",3],["035GX46640"],["WLCLKR260723604"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26"],["4-Aug-26",3],["",3],["",3],["",3],["035GX46641"],["WLCLKR260723609"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26",7],["4-Aug-26",3],["",3],["",3],["",3],["035GX46642"],["WLCLKR260723612"]],[["22-Jul-26"],["23-Jul-26"],["30-Jul-26"],["4-Aug-26",3],["",3],["",3],["",3],["035GX46817"],["WLCLKR260723391"]],[["27-Jul-26"],["27-Jul-26"],["3-Aug-26",7],["5-Aug-26",3],["",3],["",3],["",3],["6507022363"],["WLCLCH260724166"]],[["27-Jul-26"],["27-Jul-26"],["3-Aug-26"],["5-Aug-26",3],["",3],["",3],["",3],["6506487902"],["WLCLCH260721852"]],[["27-Jul-26"],["27-Jul-26"],["3-Aug-26"],["5-Aug-26",3],["",3],["",3],["",3],["6506487900"],["WLCLCH260723179"],0,0,["SBKK00528576"]],[["27-Jul-26"],["27-Jul-26"],["3-Aug-26"],["5-Aug-26",3],["",3],["",3],["",3],["6506487901"],["WLCLCH260723181"],0,0,["SBKK00528578"]],[["27-Jul-26"],["27-Jul-26"],["3-Aug-26"],["5-Aug-26",3],["",3],["",3],["",3],["6506487903"],["WLCLCH260723182"],0,0,["SBKK00528577"]],[["3-Aug-26",3],["3-Aug-26",3],["3-Aug-26",3],["6-Aug-26",3],["",3],["",3],["",3],["6508470700"]],[["4-Aug-26",3],["4-Aug-26",3],["4-Aug-26",3],["14-Aug-26",3],["",3],["",3],["SNLGLCHL015792",3],["SNLGLCHL015548"],0,0,0,["CANCEL FEE x 2 / DET",3]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["275128608"],0,0,0,["SBKK00537233"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX47908"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["REQ CANCEL",3],["035GX48537"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX48709"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX48708"],["K.Mint"],0,0,["SBKK00535133",6]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["REQ CANCEL",3],["035GX48707"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX49302"],0,0,0,["1x20"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX49300"],0,0,0,["4x20"]],[["6-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["5268486"],["035GX49192"],0,0,["SBKK00537318",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50070"],0,0,["10"],["SBKK00535145",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50071"],0,0,["10"],["SBKK00535144",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50072"],0,0,["10"],["SBKK00535126",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50795",2],["K.Ploy"],0,["8",3],["SBKK00534398",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50389",2],["K.Ploy"],0,["8",3],["SBKK00534401",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50388",2],["K.Ploy"],0,["8",3],["SBKK00534402",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX50073",2],["K.Ploy"],0,["8",3],["SBKK00534403",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX51302"],["K.Ploy"],0,["8",3],["SBKK00534404",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX51301"],["K.Ploy"],0,["8",3],["SBKK00534405",6]],[["6-Aug-26"],0,0,["14-Aug-26"],0,0,0,["035GX51491"],["K.Ploy"],0,["10"],["SBKK00534406",6]],[["10-Aug-26"],0,0,["21-Aug-26"],0,0,0,["035GX50057",2],["K.Ploy"],0,["14",3],["SBKK00534407",6]],[["10-Aug-26"],0,0,["21-Aug-26"],0,0,0,["035GX50058",2],["K.Ploy"],0,["14",3],["SBKK00534408",6]],[["10-Aug-26"],0,0,["21-Aug-26"],0,0,0,["035GX50059",2],["K.Ploy"],0,["14",3],["SBKK00534409",6]],[["10-Aug-26"],0,0,["21-Aug-26"],0,0,0,["035GX49288",2],["K.Ploy"],0,["14",3],["SBKK00534410",6]],[["10-Aug-26"],0,0,["21-Aug-26"],0,0,0,["035GX50056"]],[["13-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX48727"],0,0,0,["3x40 + 1x20"]],[["13-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],0,0,0,0,["1x20"]],[["13-Aug-26",3],["",3],["",3],["",3],["",3],["",3],["",3],["035GX49194"],0,0,0,["1x20"]]],"freeze":0},{"name":"P'MIKI","w":[88,91,67,74,62,86,103,123,111,68,77,143,113,86,86,86],"rows":[[["CY-RTN"],["SI&VGM"],["BL"],["ETD"],["AR"],["AP"],["PRE-ALERT"],["BOOKING NO."],["JOB NO."],["HBL"],["MBL"],["INVOICE"],["REQ"]],[["16-Jun-26"],["16-Jun-26"],["16-Jun-26"],["22-Jun-26"],["x"],["x"],["x"],["GOSUBKK80458791"],["WLCBKK260616118"]],[["16-Jun-26"],["16-Jun-26"],["16-Jun-26"],["22-Jun-26"],["x"],["x"],["x"],["050600720354"],["WLCLKR260625370"],0,0,0,["RATE RF 150/HC"]],[["17-Jun-26"],["17-Jun-26"],["17-Jun-26"],["23-Jun-26"],["x"],["x"],["x"],["2330099840"],["WLCBKK260614359"]],[["17-Jun-26"],["17-Jun-26"],["17-Jun-26"],["23-Jun-26"],["x"],["x"],["x"],["2330116200"],["WLCBKK260614341"]],[["17-Jun-26"],["17-Jun-26"],["17-Jun-26"],["24-Jun-26"],["x"],["x"],["x"],["TH01124203"],["WLCLKR260614163"]],[["26-Jun-26"],["26-Jun-26"],["26-Jun-26"],["28-Jun-26"],["x"],["x"],["x"],["BKKGH7661400"],["WLCBKK260614126"],0,0,0,["DEM"]],[["26-Jun-26"],["26-Jun-26"],["26-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["CULVSCS2600762"],["WLCBKK260622437"],0,0,0,["RATE RF 50/20"]],[["26-Jun-26"],["26-Jun-26"],["29-Jun-26"],["2-Jul-26"],["x"],["x"],["x"],["BKKGM0412800"],["WLCBKK260626335"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["2-Jul-26"],["x"],["x"],["x"],["BKKGH7719800"],["WLCBKK260625533"]],[["29-Jun-26"],["29-Jun-26"],["1-Jul-26"],["6-Jul-26"],["x"],["x"],["x"],["GOSUBKK80458809"],["WLCBKK260625471"]],[["30-Jun-26"],["30-Jun-26"],["30-Jun-26"],["5-Jul-26"],["x"],["x",1],["x"],["HASLS22260600086"],["WLCBKK260622740"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["10-Jul-26"],["x"],["x"],["x"],["TH01125272"],["WLCLKR260614198"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["10-Jul-26"],["x"],["x"],["x"],["TRLBKKPKG6610939"],["WLCBKK260702266"]],[["6-Jul-26"],["6-Jul-26"],["6-Jul-26"],["13-Jul-26"],["x"],["x"],["x"],["BKKGJ1655800"],["WLCBKK260625548"],0,["6506567600"]],[["14-Jul-26"],["14-Jul-26"],["17-Jul-26"],["20-Jul-26"],["x"],["x"],["x"],["050600826578"],["WLCLKR260721348"]],[["20-Jul-26"],["21-Jul-26"],["23-Jul-26"],["27-Jul-26"],["x"],["27-Jul-26",1],["x"],["050600822522"],["WLCLKR260724177"]],[["20-Jul-26"],["20-Jul-26"],["24-Jul-26"],["28-Jul-26"],["x"],["30-Jul-26",1],["x"],["BKKGQ0312400"],["WLCBKK260725411"]],[["21-Jul-26"],["21-Jul-26"],["27-Jul-26"],["30-Jul-26"],["x"],["30-Jul-26",1],["x"],["BLCHC26029806"],["WLCLKR260725420"]],[["24-Jul-26"],["24-Jul-26"],["24-Jul-26"],["2-Aug-26"],["x",3],["",3],["",3],["8882510830"],["WLCLKR260809587"],0,0,0,["1120017972"]],[["30-Jul-26"],["30-Jul-26"],["30-Jul-26"],["5-Aug-26",3],["",3],["",3],["",3],["BKKGR7144800"],0,0,["5x20"],["NATTHA BHUM V.062S"],["S/C : BKKB02074A"]],[["3-Aug-26",3],["5-Aug-26",3],["5-Aug-26",3],["11-Aug-26",3],["",3],["",3],["",3],["BKKGS1877900"]],[["7-Aug-26",3],["7-Aug-26",3],["7-Aug-26",3],["18-Aug-26",3],["",3],["",3],["",3],["BKKGS7904600"],0,0,["1x20"],0,["One Quote"]],[["7-Aug-26",3],["",3],["",3],["",3],["",3],["19-Aug-26",3],["7x20",3],["BKKGS2029600"],0,0,0,0,["1120017980"]],[["10-Aug-26",3],["",3],["",3],["",3],["",3],["23-Aug-26",3],["6x20",3],["BKKGS2100300"],0,0,0,0,["1120017981"]],[["12-Aug-26",3],["15-Aug-26",3],["15-Aug-26",3],["21-Aug-26",3],["",3],["",3],["",3],["BKKGR0853800"],0,0,0,0,["1120017974"]],[["18-Aug-26",3],["21-Aug-26",3],["21-Aug-26",3],["28-Aug-26",3],["",3],["",3],["",3],["BKKGR0859700"],0,0,0,0,["1120017975"]],[["24-Aug-26",3],["28-Aug-26",3],["28-Aug-26",3],["2-Sep-26",3],["",3],["",3],["",3],["HASLS22260702128"],0,0,["8x20"],0,["1120017976"]],[["24-Aug-26",3],["28-Aug-26",3],["28-Aug-26",3],["2-Sep-26",3],["",3],["",3],["",3],["HASLS22260702129"],0,0,["3x20"],0,["1120017977"]],[["24-Aug-26",3],["",3],["",3],["",3],["check rate",3],["1-Sep-26",3],["6x20",3],["BKKGS2102500"],0,0,0,0,["1120017982"]],[["24-Aug-26",3],["",3],["",3],["",3],["check rate",3],["1-Sep-26",3],["3x20",3],["BKKGS2103600"]]],"freeze":0},{"name":"N'NOEI","w":[87,90,61,68,62,86,131,122,113,68,70,92,343,86,86,86],"rows":[[["CY-RTN"],["SI&VGM"],["BL"],["ETD"],["AR"],["AP"],["PRE-ALERT"],["BOOKING NO."],["JOB NO."],["HBL"],["MBL"],["INVOICE"],["REQ"]],[["3-Jul-26"],["3-Jul-26"],["3-Jul-26"],["10-Jul-26"],["x"],["x"],["x"],["TRLBKKPKG6610939"],["WLCBKK260702266"]],[["15-Jul-26"],["15-Jul-26"],["20-Jul-26"],["24-Jul-26"],["x",6],["x",1],["OBL STORAGE CHARGE",3],["6507022362"],["WLCLKR260717250"]],[["20-Jul-26"],["20-Jul-26"],["23-Jul-26"],["23-Jul-26"],["x"],["x",6],["x"],["274010441"],["WLCLCH260723186"],0,0,0,["2607-376136568"]],[["20-Jul-26"],["21-Jul-26"],["24-Jul-26"],["25-Jul-26"],["x",6],["x",1],["OBL",3],["6506555301"],["WLCLKR260724289"]],[["21-Jul-26"],["21-Jul-26"],["21-Jul-26"],["27-Jul-26"],["x",6],["x",6],["OBL",3],["BKKGP8856300"],["WLCLKR260724176"]],[["31-Jul-26"],["3-Aug-26"],["3-Aug-26"],["7-Aug-26",3],["",3],["",3],["",3],["SITGLCKK540536"],0,0,0,0,["EGT3KK149551SIT"]],[["31-Jul-26"],["31-Jul-26"],["31-Jul-26"],["8-Aug-26",3],["",3],["",3],["",3],["BKKGQ5791600"]],[["3-Aug-26",3],["4-Aug-26",3],["4-Aug-26",3],["10-Aug-26",3],["",3],["",3],["REV SVC",3],["6508584860"]],[["3-Aug-26",3],["4-Aug-26",3],["4-Aug-26",3],["10-Aug-26",3],["",3],["",3],["REV SVC",3],["6508751100"]],[["4-Aug-26",3],["4-Aug-26",3],["4-Aug-26",3],["12-Aug-26",3],["",3],["",3],["REV SVC",3],["6508530681"]],[["6-Aug-26",3],["",3],["",3],["16-Aug-26",3],["",3],["",3],["",3],["5270471"]]],"freeze":0},{"name":"TRCUK+CANCEL BOOKING","w":[87,90,61,68,62,86,103,122,113,249],"rows":[[["CY-RTN"],["SI&VGM"],["BL"],["ETD"],["AR"],["AP"],["PRE-ALERT"],["BOOKING NO."],["JOB NO."],["REQ"]],[0,0,0,0,0,0,0,["BKKGH9136300"],0,["BKKGH7651300, BKKGH7673700, BKKGH7682700, BKKGH7703800"]],[0,0,0,0,0,0,0,["BKKGH9309500"]],[0,0,0,0,0,0,0,["BKKGH9149700"]],[0,0,0,0,0,0,0,["BKKGH9129500"]],[0,0,0,0,0,0,0,0,["WLDLCH260701912"],["INV-202607001"]],[0,0,0,0,0,0,0,0,["WLDLCH260701913"],["INV-202607002"]],[0,0,0,0,0,0,0,0,["WLDLCH260701911"],["INV-202607003"]],[0,0,0,0,0,0,0,0,["WLDLCH260701906"],["INV-202607004"]],[0,0,0,0,0,0,0,0,["WLDLCH260701914"],["INV-202607008"]],[0,0,0,0,0,0,0,["050600600600"],["WLCLKR260523104"],["INV.1120017725/EX2605-00201"]],[0,0,0,0,0,0,0,["BKK260601071"],0,["ส่งใบเสร็จ"]],[0,["美国天泰"],0,0,0,0,["WLCLCH260626589"],["EMANIFEST SUBMISSION SEA EDI"],["Film"],["Add CNY 5"]]],"freeze":0},{"name":"PRE-ALERT","w":[80,190],"rows":[[["SHIPPER",8],["D.B.GROUP (THAILAND) CO., LTD.",9]],[["CONSIGNEE",8],["D.B.GROUP AMERICA, LTD.",9]],[["NOTIFY",8],["SAME AS CONSIGNEE",9]],[["BOOKING NO.",8],["6503677650",9]],[["HB/L NO.",8],["WLC60623133 (TLX)",9]],[["MB/L NO.",8],["COSU6503677650 (SWB)",9]],[["F/V NAME",8],["OOCL MAGNOLIA V.005E",9]],[["ETD POL",8],["20 JUN 2026",9]],[["M/V NAME",8],["-",9]],[["ETA POD",8],["31 JUL 2026",9]],[["VOLUME",8],["1X20DC",9]]],"freeze":0},{"name":"ISF","w":[225,186],"rows":[[["AMS NO. :",8],["DBGASBKK00528580",9]],[["SCAC CODE HBL :",8],["DBGA",9]],[["HBL NO :",8],["SBKK00528580",9]],[["SCAC CODE MBL:          ",8],["COSU",9]],[["MBL NO.:",8],["COSU6506487902",9]],[["VESSEL: ",8],["COSCO SHIPPING LILY",9]],[["VOYAGE:   ",8],["002E",9]],[["VESSEL FLAG:   ",8],["HONG KONG",9]],[["PORT OF LOADING:    ",8],["Shanghai",9]],[["ETD PORT OF LOADING:    ",8],["20 AUG 2026",9]],[["LAST FOREIGN PORT BEFORE USA:    ",8],["Panama Canal ETD : 11 SEP 2026",9]],[["FIRST PORT CALLING IN USA:     ",8],["New York ETA : 17 SEP 2026",9]]],"freeze":0}]};
+// ═══════════════════════════════════════════════════════
+// WORK SHEET — ยก Excel ของ CS (WORK FILM.xlsx) มาไว้ใน CS Hub ทั้งเล่ม
+// แก้ไขได้เหมือน Excel: พิมพ์ในช่อง, ระบายสี, แทรก/ลบแถว-คอลัมน์, สลับชีต
+// เก็บใน localStorage · export กลับเป็น .xlsx ได้
+// ═══════════════════════════════════════════════════════
+const LS_WORKSHEET = 'cshub_worksheet_v1';
+const WS_PALETTE = [
+  {c:'', n:'ไม่มีสี'},
+  {c:'FFFF00', n:'เหลือง'},
+  {c:'00B0F0', n:'ฟ้า'},
+  {c:'92D050', n:'เขียวอ่อน'},
+  {c:'00B050', n:'เขียว'},
+  {c:'FFC000', n:'ส้ม'},
+  {c:'FF0000', n:'แดง'},
+  {c:'CCD4DE', n:'เทา'},
+];
+let wsBook = null;
+let wsActive = 0;
+let wsSel = null;          // {r1,c1,r2,c2}
+let wsAnchor = null;
+let wsDragging = false;
+let wsSaveTimer = null;
+
+function wsCell(row, c){
+  const v = row[c];
+  if(v===0 || v==null) return ['',0];
+  if(Array.isArray(v)) return [v[0]==null?'':String(v[0]), v[1]||0];
+  return [String(v),0];
+}
+function wsSet(sh, r, c, txt, sid){
+  while(sh.rows.length<=r) sh.rows.push([]);
+  const row = sh.rows[r];
+  while(row.length<=c) row.push(0);
+  if(!txt && !sid){ row[c]=0; return; }
+  row[c] = sid ? [txt, sid] : [txt];
+}
+function wsCols(sh){
+  let n = (sh.w||[]).length;
+  sh.rows.forEach(r=>{ if(r.length>n) n=r.length; });
+  return Math.max(n, 1);
+}
+function wsStyle(id){ return (id && wsBook.styles[id-1]) || null; }
+function wsStyleId(bg, fg, b){
+  if(!bg && !fg && !b) return 0;
+  for(let i=0;i<wsBook.styles.length;i++){
+    const s = wsBook.styles[i];
+    if((s.bg||'')===(bg||'') && (s.fg||'')===(fg||'') && !!s.b===!!b) return i+1;
+  }
+  wsBook.styles.push({bg:bg||null, fg:fg||null, b:b?1:0});
+  return wsBook.styles.length;
+}
+function wsColLetter(i){ let s=''; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+
+function loadWorksheet(){
+  try{ wsBook = JSON.parse(localStorage.getItem(LS_WORKSHEET)||'null'); }catch(e){ wsBook=null; }
+  if(!wsBook || !Array.isArray(wsBook.sheets) || !wsBook.sheets.length){
+    wsBook = JSON.parse(JSON.stringify(WS_SEED));
+  }
+  if(!Array.isArray(wsBook.styles)) wsBook.styles = [];
+  if(wsActive >= wsBook.sheets.length) wsActive = 0;
+}
+function saveWorksheet(){
+  try{ localStorage.setItem(LS_WORKSHEET, JSON.stringify(wsBook)); }
+  catch(e){ toast('❌ บันทึกไม่สำเร็จ: '+e.message); }
+  if(typeof cloudSyncConfig==='function'){ try{ cloudSyncConfig(); }catch(e){} }
+}
+function wsScheduleSave(){ clearTimeout(wsSaveTimer); wsSaveTimer = setTimeout(saveWorksheet, 400); }
+
+// ── render ──────────────────────────────────────────────
+function render_worksheet(){
+  if(!wsBook) loadWorksheet();
+  g('topbar_actions').innerHTML =
+    `<button class="btn btn-ghost" onclick="wsImportXlsx()">📥 Import Excel</button>`+
+    `<button class="btn btn-ghost" onclick="wsExportXlsx()">📊 Export Excel</button>`;
+  const sh = wsBook.sheets[wsActive];
+  const nCols = wsCols(sh);
+  const w = sh.w || [];
+  const colgroup = '<col style="width:44px">' + Array.from({length:nCols}, (_,c)=>
+      `<col style="width:${Math.max(38, w[c]||110)}px">`).join('');
+  const head = '<th class="ws-corner"></th>' + Array.from({length:nCols}, (_,c)=>
+      `<th class="ws-colh" data-c="${c}">${wsColLetter(c)}<span class="ws-grip" data-c="${c}"></span></th>`).join('');
+  const body = sh.rows.map((row, r)=>{
+    const tds = Array.from({length:nCols}, (_,c)=>{
+      const [txt, sid] = wsCell(row, c);
+      const st = wsStyle(sid);
+      let style = '';
+      if(st){
+        if(st.bg) style += 'background:#'+st.bg+';';
+        if(st.fg) style += 'color:#'+st.fg+';';
+        if(st.b)  style += 'font-weight:700;';
+      }
+      return `<td class="ws-c" data-r="${r}" data-c="${c}" style="${style}" contenteditable="true" spellcheck="false">${escapeHtml(txt)}</td>`;
+    }).join('');
+    return `<tr><th class="ws-rowh" data-r="${r}">${r+1}</th>${tds}</tr>`;
+  }).join('');
+
+  const swatches = WS_PALETTE.map(p=>
+    `<button class="ws-sw" title="${p.n}" data-bg="${p.c}" onclick="wsApplyFill('${p.c}')" style="background:${p.c?'#'+p.c:'#fff'}${p.c?'':';background-image:linear-gradient(45deg,transparent 45%,#c1402f 45%,#c1402f 55%,transparent 55%)'}"></button>`).join('');
+  const tabs = wsBook.sheets.map((s,i)=>
+    `<button class="ws-tab ${i===wsActive?'on':''}" onclick="wsGoSheet(${i})" ondblclick="wsRenameSheet(${i})">${escapeHtml(s.name)}</button>`).join('');
+
+  g('page-worksheet').innerHTML = `
+    <div class="ws-bar">
+      <div class="ws-grp">${swatches}</div>
+      <div class="ws-grp">
+        <button class="btn btn-ghost btn-sm" onclick="wsToggleBold()"><b>B</b></button>
+        <button class="btn btn-ghost btn-sm" onclick="wsApplyText('FF0000')" style="color:#c1402f">A</button>
+        <button class="btn btn-ghost btn-sm" onclick="wsClearFormat()">ล้างสี</button>
+      </div>
+      <div class="ws-grp">
+        <button class="btn btn-ghost btn-sm" onclick="wsInsertRow(0)">↑ แทรกแถว</button>
+        <button class="btn btn-ghost btn-sm" onclick="wsInsertRow(1)">↓ แทรกแถว</button>
+        <button class="btn btn-ghost btn-sm" onclick="wsDeleteRow()">🗑 ลบแถว</button>
+      </div>
+      <div class="ws-grp">
+        <button class="btn btn-ghost btn-sm" onclick="wsInsertCol()">แทรกคอลัมน์</button>
+        <button class="btn btn-ghost btn-sm" onclick="wsDeleteCol()">ลบคอลัมน์</button>
+      </div>
+      <div class="ws-grp">
+        <button class="btn btn-ghost btn-sm" onclick="wsOpenShipment()">🔗 เปิด Shipment ของแถวนี้</button>
+      </div>
+      <div class="ws-grp" style="margin-left:auto">
+        <input id="ws_find" class="inp" placeholder="ค้นหาในชีต…" style="width:180px;height:30px" oninput="wsFind(this.value)">
+        <span class="ws-info" id="ws_info"></span>
+      </div>
+    </div>
+    <div class="ws-wrap" id="ws_wrap">
+      <table class="ws-tbl" id="ws_tbl"><colgroup>${colgroup}</colgroup>
+        <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+    </div>
+    <div class="ws-tabs">${tabs}
+      <button class="ws-tab add" onclick="wsAddSheet()">＋</button>
+      <button class="ws-tab add" onclick="wsDeleteSheet()" title="ลบชีตนี้">🗑</button>
+    </div>`;
+  wsBindGrid();
+  wsPaintSel();
+  wsInfo();
+}
+function wsInfo(){
+  const sh = wsBook.sheets[wsActive];
+  const el = g('ws_info'); if(!el) return;
+  el.textContent = sh.rows.length+' แถว × '+wsCols(sh)+' คอลัมน์';
+}
+window.wsGoSheet = function(i){ wsActive=i; wsSel=null; render_worksheet(); };
+
+// ── selection + editing ─────────────────────────────────
+function wsBindGrid(){
+  const tbl = g('ws_tbl'); if(!tbl) return;
+  tbl.addEventListener('mousedown', e=>{
+    const td = e.target.closest('td.ws-c');
+    const rh = e.target.closest('th.ws-rowh');
+    const ch = e.target.closest('th.ws-colh');
+    if(e.target.classList.contains('ws-grip')){ wsStartResize(e); return; }
+    const sh = wsBook.sheets[wsActive];
+    if(rh){ const r=+rh.dataset.r; wsSel={r1:r,c1:0,r2:r,c2:wsCols(sh)-1}; wsAnchor={r,c:0}; wsPaintSel(); return; }
+    if(ch){ const c=+ch.dataset.c; wsSel={r1:0,c1:c,r2:sh.rows.length-1,c2:c}; wsAnchor={r:0,c}; wsPaintSel(); return; }
+    if(!td) return;
+    const r=+td.dataset.r, c=+td.dataset.c;
+    if(e.shiftKey && wsAnchor){ wsSel={r1:wsAnchor.r,c1:wsAnchor.c,r2:r,c2:c}; }
+    else { wsAnchor={r,c}; wsSel={r1:r,c1:c,r2:r,c2:c}; wsDragging=true; }
+    wsPaintSel();
+  });
+  tbl.addEventListener('mouseover', e=>{
+    if(!wsDragging) return;
+    const td = e.target.closest('td.ws-c'); if(!td) return;
+    wsSel = {r1:wsAnchor.r, c1:wsAnchor.c, r2:+td.dataset.r, c2:+td.dataset.c};
+    wsPaintSel();
+  });
+  if(!window._wsMouseUpBound){ window._wsMouseUpBound = true;
+    document.addEventListener('mouseup', ()=>{ wsDragging=false; }); }
+  tbl.addEventListener('input', e=>{
+    const td = e.target.closest('td.ws-c'); if(!td) return;
+    const sh = wsBook.sheets[wsActive];
+    const r=+td.dataset.r, c=+td.dataset.c;
+    const [,sid] = wsCell(sh.rows[r]||[], c);
+    wsSet(sh, r, c, td.textContent.replace(/ /g,' ').trim(), sid);
+    wsScheduleSave();
+  });
+  tbl.addEventListener('keydown', e=>{
+    const td = e.target.closest('td.ws-c'); if(!td) return;
+    const r=+td.dataset.r, c=+td.dataset.c;
+    const move=(dr,dc)=>{ const n=tbl.querySelector(`td.ws-c[data-r="${r+dr}"][data-c="${c+dc}"]`);
+      if(n){ e.preventDefault(); n.focus(); wsAnchor={r:r+dr,c:c+dc}; wsSel={r1:r+dr,c1:c+dc,r2:r+dr,c2:c+dc}; wsPaintSel();
+             const sel=window.getSelection(); sel.selectAllChildren(n); sel.collapseToEnd(); } };
+    if(e.key==='Enter' && !e.shiftKey) return move(1,0);
+    if(e.key==='ArrowDown') return move(1,0);
+    if(e.key==='ArrowUp')   return move(-1,0);
+    if(e.key==='Tab')       return move(0, e.shiftKey?-1:1);
+    if(e.key==='Escape')    { td.blur(); }
+    if(e.key==='Delete' && wsSel && (wsSel.r1!==wsSel.r2 || wsSel.c1!==wsSel.c2)){ e.preventDefault(); wsClearCells(); }
+  });
+}
+function wsRange(){
+  if(!wsSel) return null;
+  return {r1:Math.min(wsSel.r1,wsSel.r2), r2:Math.max(wsSel.r1,wsSel.r2),
+          c1:Math.min(wsSel.c1,wsSel.c2), c2:Math.max(wsSel.c1,wsSel.c2)};
+}
+function wsPaintSel(){
+  const tbl = g('ws_tbl'); if(!tbl) return;
+  tbl.querySelectorAll('td.ws-c.sel').forEach(td=>td.classList.remove('sel'));
+  const R = wsRange(); if(!R) return;
+  for(let r=R.r1;r<=R.r2;r++) for(let c=R.c1;c<=R.c2;c++){
+    tbl.querySelector(`td.ws-c[data-r="${r}"][data-c="${c}"]`)?.classList.add('sel');
+  }
+}
+function wsEachSelected(fn){
+  const R = wsRange(); if(!R){ toast('เลือกช่องก่อนครับ'); return false; }
+  const sh = wsBook.sheets[wsActive];
+  for(let r=R.r1;r<=R.r2;r++) for(let c=R.c1;c<=R.c2;c++) fn(sh, r, c);
+  saveWorksheet(); render_worksheet(); return true;
+}
+window.wsApplyFill = function(bg){
+  wsEachSelected((sh,r,c)=>{
+    const [txt,sid] = wsCell(sh.rows[r]||[], c); const st = wsStyle(sid)||{};
+    wsSet(sh, r, c, txt, wsStyleId(bg||null, st.fg||null, st.b));
+  });
+};
+window.wsApplyText = function(fg){
+  wsEachSelected((sh,r,c)=>{
+    const [txt,sid] = wsCell(sh.rows[r]||[], c); const st = wsStyle(sid)||{};
+    wsSet(sh, r, c, txt, wsStyleId(st.bg||null, (st.fg===fg?null:fg), st.b));
+  });
+};
+window.wsToggleBold = function(){
+  const R = wsRange(); if(!R) return toast('เลือกช่องก่อนครับ');
+  const sh = wsBook.sheets[wsActive];
+  const [,sid0] = wsCell(sh.rows[R.r1]||[], R.c1);
+  const on = !(wsStyle(sid0)||{}).b;
+  wsEachSelected((s,r,c)=>{
+    const [txt,sid] = wsCell(s.rows[r]||[], c); const st = wsStyle(sid)||{};
+    wsSet(s, r, c, txt, wsStyleId(st.bg||null, st.fg||null, on));
+  });
+};
+window.wsClearFormat = function(){
+  wsEachSelected((sh,r,c)=>{ const [txt] = wsCell(sh.rows[r]||[], c); wsSet(sh, r, c, txt, 0); });
+};
+function wsClearCells(){
+  wsEachSelected((sh,r,c)=>{ const [,sid] = wsCell(sh.rows[r]||[], c); wsSet(sh, r, c, '', sid); });
+}
+
+// ── rows / columns ──────────────────────────────────────
+window.wsInsertRow = function(below){
+  const R = wsRange(); if(!R) return toast('เลือกแถวก่อนครับ');
+  const sh = wsBook.sheets[wsActive];
+  const at = below ? R.r2+1 : R.r1;
+  const n = R.r2-R.r1+1;
+  for(let i=0;i<n;i++) sh.rows.splice(at, 0, []);
+  saveWorksheet(); render_worksheet();
+};
+window.wsDeleteRow = function(){
+  const R = wsRange(); if(!R) return toast('เลือกแถวก่อนครับ');
+  const sh = wsBook.sheets[wsActive];
+  if(!confirm('ลบ '+(R.r2-R.r1+1)+' แถว?')) return;
+  sh.rows.splice(R.r1, R.r2-R.r1+1);
+  wsSel = null; saveWorksheet(); render_worksheet();
+};
+window.wsInsertCol = function(){
+  const R = wsRange(); if(!R) return toast('เลือกคอลัมน์ก่อนครับ');
+  const sh = wsBook.sheets[wsActive];
+  const n = R.c2-R.c1+1;
+  sh.rows.forEach(row=>{ while(row.length<R.c1) row.push(0); for(let i=0;i<n;i++) row.splice(R.c1,0,0); });
+  sh.w = sh.w||[]; for(let i=0;i<n;i++) sh.w.splice(R.c1,0,110);
+  saveWorksheet(); render_worksheet();
+};
+window.wsDeleteCol = function(){
+  const R = wsRange(); if(!R) return toast('เลือกคอลัมน์ก่อนครับ');
+  const sh = wsBook.sheets[wsActive];
+  if(!confirm('ลบคอลัมน์ '+wsColLetter(R.c1)+(R.c1!==R.c2?('-'+wsColLetter(R.c2)):'')+'?')) return;
+  const n = R.c2-R.c1+1;
+  sh.rows.forEach(row=> row.splice(R.c1, n));
+  if(sh.w) sh.w.splice(R.c1, n);
+  wsSel = null; saveWorksheet(); render_worksheet();
+};
+function wsStartResize(e){
+  const c = +e.target.dataset.c;
+  const sh = wsBook.sheets[wsActive];
+  const startX = e.clientX;
+  const cols = g('ws_tbl').querySelectorAll('colgroup col');
+  const start = cols[c+1].style.width ? parseInt(cols[c+1].style.width) : 110;
+  e.preventDefault();
+  const mv = ev=>{ const w = Math.max(38, start + (ev.clientX-startX)); cols[c+1].style.width = w+'px'; };
+  const up = ev=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+    sh.w = sh.w||[]; sh.w[c] = Math.max(38, start + (ev.clientX-startX)); saveWorksheet(); };
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+
+// ── sheets ──────────────────────────────────────────────
+window.wsAddSheet = function(){
+  const name = prompt('ชื่อชีตใหม่:', 'Sheet'+(wsBook.sheets.length+1));
+  if(!name) return;
+  wsBook.sheets.push({name:name.trim(), w:[], rows:[[]], freeze:1});
+  wsActive = wsBook.sheets.length-1; wsSel=null; saveWorksheet(); render_worksheet();
+};
+window.wsRenameSheet = function(i){
+  const name = prompt('เปลี่ยนชื่อชีต:', wsBook.sheets[i].name);
+  if(!name) return;
+  wsBook.sheets[i].name = name.trim(); saveWorksheet(); render_worksheet();
+};
+window.wsDeleteSheet = function(){
+  if(wsBook.sheets.length<=1) return toast('ต้องเหลืออย่างน้อย 1 ชีต');
+  if(!confirm('ลบชีต "'+wsBook.sheets[wsActive].name+'"?')) return;
+  wsBook.sheets.splice(wsActive,1);
+  wsActive = Math.max(0, wsActive-1); wsSel=null; saveWorksheet(); render_worksheet();
+};
+
+// ── find ────────────────────────────────────────────────
+window.wsFind = function(q){
+  const tbl = g('ws_tbl'); if(!tbl) return;
+  tbl.querySelectorAll('td.ws-c.hit').forEach(td=>td.classList.remove('hit'));
+  const t = (q||'').trim().toLowerCase(); if(!t) return;
+  let n=0;
+  tbl.querySelectorAll('td.ws-c').forEach(td=>{
+    if(td.textContent.toLowerCase().includes(t)){ td.classList.add('hit'); n++; }
+  });
+  g('ws_info').textContent = 'พบ '+n+' ช่อง';
+};
+
+// ── link a row back to its shipment (Action ต่างๆ) ───────
+window.wsOpenShipment = function(){
+  const R = wsRange(); if(!R) return toast('คลิกช่องในแถวที่ต้องการก่อนครับ');
+  const sh = wsBook.sheets[wsActive];
+  const row = sh.rows[R.r1] || [];
+  const vals = [];
+  for(let c=0;c<wsCols(sh);c++){ const [t]=wsCell(row,c); if(t) vals.push(t); }
+  const norm = v => String(v||'').toUpperCase().replace(/[\s.\-_/]/g,'');
+  let idx = -1;
+  for(const v of vals){
+    const k = norm(v); if(k.length<6) continue;
+    idx = shipments.findIndex(s=> norm(s.bookingNo)===k || norm(s.jobno)===k );
+    if(idx>=0) break;
+  }
+  if(idx<0) return toast('ไม่พบ shipment ที่ตรงกับแถวนี้ (เช็ค Booking No. / Job No.)');
+  goPage('shipments');
+  setTimeout(()=>{ try{ openBookingPdfModal(idx); }catch(e){ toast('เปิด shipment ไม่ได้: '+e.message); } }, 120);
+};
+
+// ── import / export ─────────────────────────────────────
+function wsColorOf(o){
+  if(!o) return null;
+  if(typeof o==='string') return o.replace('#','').slice(-6).toUpperCase();
+  if(o.rgb) return String(o.rgb).slice(-6).toUpperCase();
+  return null;
+}
+window.wsImportXlsx = function(){
+  if(!window.XLSX) return toast('⏳ กำลังโหลดตัวอ่าน Excel… ลองอีกครั้ง');
+  let inp = g('ws_xlsx_input');
+  if(!inp){
+    inp = document.createElement('input');
+    inp.type='file'; inp.id='ws_xlsx_input'; inp.accept='.xlsx,.xls,.xlsm'; inp.style.display='none';
+    inp.addEventListener('change', function(){ wsOnFile(this); });
+    document.body.appendChild(inp);
+  }
+  inp.click();
+};
+function wsOnFile(input){
+  const file = input.files && input.files[0]; input.value='';
+  if(!file) return;
+  const fr = new FileReader();
+  fr.onerror = ()=> toast('❌ อ่านไฟล์ไม่สำเร็จ');
+  fr.onload = e=>{
+    let wb;
+    try{ wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true, cellStyles:true}); }
+    catch(err){ return toast('❌ อ่าน Excel ไม่ได้: '+err.message); }
+    const book = {styles:[], sheets:[]};
+    const styleId = (bg,fg,b)=>{
+      if(!bg && !fg && !b) return 0;
+      for(let i=0;i<book.styles.length;i++){ const s=book.styles[i];
+        if((s.bg||'')===(bg||'') && (s.fg||'')===(fg||'') && !!s.b===!!b) return i+1; }
+      book.styles.push({bg:bg||null, fg:fg||null, b:b?1:0}); return book.styles.length;
+    };
+    const d2 = n=>String(n).padStart(2,'0');
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    wb.SheetNames.forEach(name=>{
+      const sheet = wb.Sheets[name];
+      const ref = sheet['!ref']; if(!ref) return;
+      const range = XLSX.utils.decode_range(ref);
+      const rows = [];
+      for(let r=range.s.r; r<=range.e.r; r++){
+        const row = [];
+        for(let c=range.s.c; c<=range.e.c; c++){
+          const cell = sheet[XLSX.utils.encode_cell({r,c})];
+          let txt = '';
+          if(cell){
+            if(cell.v instanceof Date) txt = cell.v.getDate()+'-'+MON[cell.v.getMonth()]+'-'+d2(cell.v.getFullYear()%100);
+            else if(cell.w!=null) txt = String(cell.w);
+            else if(cell.v!=null) txt = String(cell.v);
+          }
+          const st = cell && cell.s || null;
+          let bg=null, fg=null, b=false;
+          if(st){
+            bg = wsColorOf(st.fgColor) || wsColorOf(st.fill && st.fill.fgColor);
+            if(st.patternType==='none' || (st.fill && st.fill.patternType==='none')) bg=null;
+            fg = wsColorOf(st.color) || wsColorOf(st.font && st.font.color);
+            if(fg==='000000') fg=null;
+            b = !!(st.bold || (st.font && st.font.bold));
+          }
+          const sid = styleId(bg, fg, b);
+          row.push(sid ? [txt, sid] : (txt ? [txt] : 0));
+        }
+        while(row.length && row[row.length-1]===0) row.pop();
+        rows.push(row);
+      }
+      while(rows.length && !rows[rows.length-1].some(x=>x)) rows.pop();
+      const w = (sheet['!cols']||[]).map(o=> Math.round(((o&&(o.wpx || (o.wch&&o.wch*7.2)))||110)));
+      book.sheets.push({name, w, rows, freeze:1});
+    });
+    if(!book.sheets.length) return toast('❌ ไม่พบชีตในไฟล์');
+    if(!confirm('แทนที่ Work Sheet ทั้งเล่มด้วย "'+file.name+'"?\n\nในไฟล์: '+book.sheets.length+' ชีต')) return;
+    wsBook = book; wsActive = 0; wsSel = null;
+    saveWorksheet(); render_worksheet();
+    toast('📥 นำเข้าแล้ว '+book.sheets.length+' ชีต');
+  };
+  fr.readAsArrayBuffer(file);
+}
+window.wsExportXlsx = function(){
+  if(!window.XLSX) return toast('⏳ กำลังโหลดตัวสร้าง Excel… ลองอีกครั้ง');
+  const wb = XLSX.utils.book_new();
+  wsBook.sheets.forEach(sh=>{
+    const n = wsCols(sh);
+    const aoa = sh.rows.map(row=> Array.from({length:n},(_,c)=> wsCell(row,c)[0]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = Array.from({length:n},(_,c)=>({wpx: (sh.w&&sh.w[c])||110}));
+    ws['!freeze'] = {xSplit:0, ySplit:1};
+    XLSX.utils.book_append_sheet(wb, ws, sh.name.slice(0,31));
+  });
+  XLSX.writeFile(wb, 'CS_WorkSheet_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('📊 Export Excel แล้ว');
 };
 
 // ── Import shipments from the CS working Excel (e.g. WORK FILM.xlsx) ──────────
