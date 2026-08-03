@@ -283,6 +283,12 @@ function loadAll(){
   shipments.forEach(s=>{
     if(!s.id) s.id = uid('ship');
     if(s.fpod === undefined && s.del) s.fpod = s.del;
+    // Customer REF ต้องตรงกับ Shipper Ref. ใน Booking Confirmation PDF —
+    // ถ้าเคยแก้ Shipper Ref. ไว้ในฟอร์ม PDF ให้ดึงกลับมาลงคอลัมน์ Customer REF
+    if(s.bpdfData && s.bpdfData.shipperRef && String(s.bpdfData.shipperRef).trim()
+       && String(s.bpdfData.shipperRef).trim() !== String(s.custRef||'').trim()){
+      s.custRef = String(s.bpdfData.shipperRef).trim();
+    }
     if(!s.payment) s.payment = {ap:false, ar:false};
     applyAmsDefault(s); // non-US/CA destinations default to NO
     if(STATUS_MIGRATE[s.status]) s.status = STATUS_MIGRATE[s.status];
@@ -2081,10 +2087,11 @@ window.openBookingPdfModal = function(idx){
   // refreshed from the current row each time the modal opens (overwriting any
   // stale value held in bpdfData) so the table is always the single source of
   // truth. Pick Up / Turn-In Ref are tied to the Booking No. Fields that exist
-  // only in this form (Shipper Ref., vessel voy details, pickup/turn-in dates &
+  // only in this form (vessel voy details, pickup/turn-in dates &
   // places, PIC, commodity, weight, HS code, remarks…) are kept from bpdfData.
   const gridLinked = {
     bkgno:       s.bookingNo||'',
+    shipperRef:  s.custRef||'',   // Shipper Ref. on the PDF = Customer REF column
     carrier:     s.carrier||'',
     vsl:         s.feeder||'',
     motherVsl:   s.motherVsl||'',
@@ -2354,6 +2361,7 @@ window.saveTerminalFromBpdf = function(prefix){ // prefix is 'pu' or 'ti'
 // so untouched, grid-prefilled values never clobber the table.
 const BPDF_TO_GRID = [
   {b:'bkgno',         g:'bookingNo'},
+  {b:'shipperRef',    g:'custRef'},   // Shipper Ref. บน PDF = คอลัมน์ Customer REF
   {b:'carrier',       g:'carrier'},
   {b:'vsl',           g:'feeder'},
   {b:'motherVsl',     g:'motherVsl'},
