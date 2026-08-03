@@ -835,23 +835,25 @@ let _shipCS = 'all';    // selected CS folder (CS name, '—' for unassigned, or
 // columns get urgency colouring + feed the Cut-off Tracking page; `country`
 // columns (POD/FPOD) re-evaluate the ACI/AMS alert when edited.
 const GRID_COLS = [
-  {k:'bookingNo', label:'Booking No.', type:'text', w:120, mono:true},
-  {k:'jobno',     label:'Job No.',     type:'text', w:140, mono:true},
-  {k:'customer',  label:'Customer',    type:'text', w:160},
-  {k:'hblNo',     label:'HBL NO',      type:'text', w:150},
-  {k:'custRef',   label:'Customer REF', type:'text', w:140},
-  {k:'sale',      label:'Sale',        type:'text', w:120},
-  {k:'cs',        label:'CS',          type:'text', w:110},
+  // ลำดับคอลัมน์ตามไฟล์ Excel ที่ CS ใช้จริง (WORK FILM.xlsx) — ซ้าย→ขวา
   {k:'cy',        label:'CY',          type:'date'},
   {k:'rtn',       label:'RTN',         type:'date'},
   {k:'si',        label:'SI',          type:'date', cutoff:true},
   {k:'vgm',       label:'VGM',         type:'date', cutoff:true},
   {k:'bl',        label:'BL',          type:'date', cutoff:true},
-  {k:'amsaci',    label:'AMS/ISF/ACI', type:'select', options:['','YES','NO','ISF SENT'], w:120},
   {k:'etd',       label:'ETD',         type:'date'},
-  {k:'eta',       label:'ETA',         type:'date'},
   {k:'__payment', label:'AP/AR',       type:'payment'},
+  {k:'bookingNo', label:'Booking No.', type:'text', w:120, mono:true},
+  {k:'jobno',     label:'Job No.',     type:'text', w:140, mono:true},
+  {k:'hblNo',     label:'HBL NO',      type:'text', w:150},
   {k:'req',       label:'REQ',         type:'text', w:170},
+  // คอลัมน์ที่เหลือของ CS Hub (นอกเหนือจาก Excel) ต่อท้าย
+  {k:'customer',  label:'Customer',    type:'text', w:160},
+  {k:'custRef',   label:'Customer REF', type:'text', w:140},
+  {k:'sale',      label:'Sale',        type:'text', w:120},
+  {k:'cs',        label:'CS',          type:'text', w:110},
+  {k:'amsaci',    label:'AMS/ISF/ACI', type:'select', options:['','YES','NO','ISF SENT'], w:120},
+  {k:'eta',       label:'ETA',         type:'date'},
   {k:'vol',       label:'VOL',         type:'text', w:90},
   {k:'carrier',   label:'Carrier',     type:'text', w:100},
   {k:'por',       label:'POR',         type:'text', w:160},
@@ -1171,7 +1173,7 @@ function rerenderGrid(){
 }
 
 function render_shipments(){
-  g('topbar_actions').innerHTML = `<button class="btn btn-ghost" onclick="exportShipmentsExcel()">📊 Export Excel</button> <button class="btn btn-ghost" onclick="openExportToSfpModal()">⬇ Export to Sea Freight Pro</button>`;
+  g('topbar_actions').innerHTML = `<button class="btn btn-ghost" onclick="triggerShipmentExcelImport()">📥 Import Excel</button> <button class="btn btn-ghost" onclick="exportShipmentsExcel()">📊 Export Excel</button> <button class="btn btn-ghost" onclick="openExportToSfpModal()">⬇ Export to Sea Freight Pro</button>`;
   const ae = document.activeElement;
   const activeId = (ae && ae.id === 'ship_search') ? ae.id : null;
   const activeCursor = activeId ? ae.selectionStart : null;
@@ -1885,6 +1887,195 @@ window.exportShipmentsExcel = function(){
   XLSX.writeFile(wb, `CS_Shipments_${today}.xlsx`);
   toast('📊 Export Excel แล้ว ('+list.length+' รายการ)');
 };
+
+// ── Import shipments from the CS working Excel (e.g. WORK FILM.xlsx) ──────────
+// รูปแบบไฟล์: 1 ชีต = CS 1 คน (ชื่อชีต = ชื่อ CS) · แถวบนสุดคือหัวตาราง
+// ชีตที่ชื่อมี CANCEL = ตั้ง Status เป็น Cancelled · ชีต PRE-ALERT / ISF เป็น
+// เทมเพลตข้อความ ไม่ใช่ตาราง shipment จึงข้ามไป
+const XLIMP_SKIP_SHEETS = /^(PRE[\s-]?ALERT|ISF)$/i;
+const XLIMP_CANCEL_SHEET = /CANCEL/i;
+// คอลัมน์ที่ผู้ใช้สั่งว่า "ไม่ต้องเอามา"
+const XLIMP_IGNORE = /^(MB\/?L( NO\.?)?|INVOICE|PRE[\s-]?ALERT)$/i;
+const XLIMP_HEADERS = {
+  'CY-RTN':'__cyrtn', 'CY RTN':'__cyrtn', 'CY/RTN':'__cyrtn', 'CY':'cy', 'RTN':'rtn',
+  'SI&VGM':'__sivgm', 'SI & VGM':'__sivgm', 'SI/VGM':'__sivgm', 'SI':'si', 'VGM':'vgm',
+  'BL':'bl', 'B/L':'bl', 'DRAFT BL':'bl',
+  'ETD':'etd', 'ETA':'eta',
+  'AR':'__ar', 'AP':'__ap',
+  'BOOKING NO.':'bookingNo', 'BOOKING NO':'bookingNo', 'BOOKING':'bookingNo',
+  'JOB NO.':'jobno', 'JOB NO':'jobno', 'JOBNO':'jobno',
+  'HBL':'hblNo', 'HBL NO':'hblNo', 'HBL NO.':'hblNo', 'HB/L':'hblNo', 'HB/L NO.':'hblNo',
+  'REQ':'req', 'REMARK':'req', 'REMARKS':'req',
+  'CUSTOMER':'customer', 'CUSTOMER REF':'custRef', 'CUST REF':'custRef',
+  'SALE':'sale', 'SALES':'sale', 'CS':'cs',
+  'VOL':'vol', 'VOLUME':'vol', 'CARRIER':'carrier',
+  'POR':'por', 'POL':'pol', 'POD':'pod', 'FPOD':'fpod',
+  'FEEDER':'feeder', 'MOTHER VESSEL':'motherVsl', 'MOTHER VSL':'motherVsl',
+  'AMS/ISF/ACI':'amsaci', 'AMS':'amsaci', 'STATUS':'__status',
+};
+function xlimpNorm(v){ return String(v==null?'':v).replace(/ /g,' ').replace(/\s+/g,' ').trim(); }
+function xlimpKeyOf(v){
+  return xlimpNorm(v).toUpperCase().replace(/[\s.\-_/]/g,'');
+}
+// วันที่จาก Excel: cellDates ให้ Date object · ถ้าเป็นข้อความใช้ parseFlexibleDate
+function xlimpDate(v){
+  if(v==null || v==='') return '';
+  if(v instanceof Date && !isNaN(v)){
+    return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  }
+  if(typeof v==='number' && v>20000 && v<80000){ // Excel serial date (เผื่อไฟล์ไม่ได้ตีความเป็นวันที่)
+    const d = new Date(Date.UTC(1899,11,30) + Math.round(v)*86400000);
+    return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+  }
+  const dt = parseFlexibleDate(xlimpNorm(v));
+  if(!dt || isNaN(dt)) return '';
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+// ช่องรวม เช่น CY-RTN / SI&VGM → คืน [วันแรก, วันสอง]
+// ค่าเดียว = ใช้วันเดียวกันทั้งสองช่อง (ตามที่ผู้ใช้เลือก)
+function xlimpDatePair(v){
+  const one = xlimpDate(v);
+  if(one) return [one, one];
+  const txt = xlimpNorm(v);
+  if(!txt) return ['',''];
+  const parts = txt.split(/\s*(?:-|~|\/\/|to)\s*/i).filter(Boolean);
+  if(parts.length>=2){
+    const a = xlimpDate(parts[0]), b = xlimpDate(parts[1]);
+    if(a || b) return [a||b, b||a];
+  }
+  return ['',''];
+}
+function xlimpFlag(v){
+  const t = xlimpNorm(v).toUpperCase();
+  return !!t && t!=='-' && t!=='0' && t!=='NO';
+}
+// อ่าน workbook → คืน array ของ patch object (เฉพาะช่องที่มีค่าในไฟล์)
+function xlimpParseWorkbook(wb){
+  const out = [];
+  wb.SheetNames.forEach(name=>{
+    if(XLIMP_SKIP_SHEETS.test(xlimpNorm(name))) return;
+    const isCancel = XLIMP_CANCEL_SHEET.test(name);
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:''});
+    // หาแถวหัวตาราง (ภายใน 10 แถวแรก)
+    let hRow = -1;
+    for(let i=0; i<Math.min(10, aoa.length); i++){
+      const keys = (aoa[i]||[]).map(xlimpKeyOf);
+      if(keys.includes('BOOKINGNO') || keys.includes('ETD')){ hRow = i; break; }
+    }
+    if(hRow < 0) return;
+    const map = (aoa[hRow]||[]).map(h=>{
+      const raw = xlimpNorm(h);
+      if(!raw || XLIMP_IGNORE.test(raw)) return null;
+      const k = xlimpKeyOf(raw);
+      for(const label in XLIMP_HEADERS){ if(xlimpKeyOf(label)===k) return XLIMP_HEADERS[label]; }
+      return null;
+    });
+    for(let r=hRow+1; r<aoa.length; r++){
+      const row = aoa[r]||[];
+      if(!row.some(c=>xlimpNorm(c)!=='')) continue;
+      const patch = {}; let hasKey = false;
+      let ar=null, ap=null;
+      map.forEach((field, ci)=>{
+        if(!field) return;
+        const cell = row[ci];
+        if(field==='__cyrtn'){ const [a,b]=xlimpDatePair(cell); if(a){patch.cy=a; patch.rtn=b;} return; }
+        if(field==='__sivgm'){ const [a,b]=xlimpDatePair(cell); if(a){patch.si=a; patch.vgm=b;} return; }
+        if(field==='__ar'){ if(xlimpNorm(cell)!=='') ar = xlimpFlag(cell); return; }
+        if(field==='__ap'){ if(xlimpNorm(cell)!=='') ap = xlimpFlag(cell); return; }
+        if(field==='__status'){ const t=xlimpNorm(cell); if(t) patch.status=t; return; }
+        const col = GRID_COLS.find(c=>c.k===field);
+        if(col && col.type==='date'){ const d = xlimpDate(cell); if(d) patch[field]=d; return; }
+        const t = xlimpNorm(cell);
+        if(t){ patch[field]=t; if(field==='bookingNo'||field==='jobno') hasKey=true; }
+      });
+      if(ar!==null || ap!==null) patch.__payment = {ar:!!ar, ap:!!ap};
+      if(!hasKey && Object.keys(patch).length===0) continue;
+      if(!patch.bookingNo && !patch.jobno) continue; // ต้องมี Booking หรือ Job No. อย่างน้อยหนึ่ง
+      if(isCancel) patch.status = 'Cancelled';
+      if(!patch.cs && !isCancel) patch.cs = xlimpNorm(name);
+      patch.__sheet = xlimpNorm(name);
+      out.push(patch);
+    }
+  });
+  return out;
+}
+function xlimpMatchKey(o){
+  const b = xlimpKeyOf(o.bookingNo||'');
+  if(b) return 'B:'+b;
+  const j = xlimpKeyOf(o.jobno||'');
+  return j ? 'J:'+j : '';
+}
+window.triggerShipmentExcelImport = function(){
+  if(!window.XLSX){ toast('⏳ กำลังโหลดตัวอ่าน Excel… ลองอีกครั้ง'); return; }
+  let inp = g('ship_xlsx_input');
+  if(!inp){
+    inp = document.createElement('input');
+    inp.type='file'; inp.id='ship_xlsx_input'; inp.accept='.xlsx,.xls,.xlsm';
+    inp.style.display='none';
+    inp.addEventListener('change', function(){ onShipmentExcelSelected(this); });
+    document.body.appendChild(inp);
+  }
+  inp.click();
+};
+window.onShipmentExcelSelected = function(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onerror = function(){ toast('❌ อ่านไฟล์ไม่สำเร็จ'); };
+  reader.onload = function(e){
+    let rows;
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      rows = xlimpParseWorkbook(wb);
+    }catch(err){ toast('❌ อ่าน Excel ไม่ได้: '+err.message); return; }
+    if(!rows.length){ toast('❌ ไม่พบแถว shipment ในไฟล์ (ต้องมีหัวตาราง BOOKING NO. หรือ ETD)'); return; }
+    applyShipmentExcel(rows, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+};
+// แทนที่รายการ shipment ทั้งหมดด้วยแถวใน Excel
+// Booking No. ที่มีอยู่แล้ว → คงทุกอย่างเดิมไว้ (Checklist / Booking PDF / Status /
+// Payment / ท่าเรือ / ลูกค้า) แล้วอัปเดตเฉพาะช่องที่ไฟล์มีค่า → Action ไม่หลุด
+window.applyShipmentExcel = function(rows, fname){
+  const byKey = new Map();
+  shipments.forEach(s=>{ const k = xlimpMatchKey(s); if(k && !byKey.has(k)) byKey.set(k, s); });
+  let kept=0, added=0;
+  const dropped = shipments.filter(s=>{
+    const k = xlimpMatchKey(s);
+    return !rows.some(r=> xlimpMatchKey(r)===k );
+  }).length;
+  if(!confirm(
+    'นำตารางจาก "'+fname+'" มาแทน Shipment ทั้งหมด?\n\n'+
+    'ในไฟล์: '+rows.length+' แถว\n'+
+    'ของเดิม: '+shipments.length+' รายการ → จะถูกลบออก '+dropped+' รายการที่ไม่มีในไฟล์\n\n'+
+    'แถวที่ Booking No. ตรงกับของเดิม จะคง Checklist / Booking PDF / Status ไว้ครบ')) return;
+
+  const next = rows.map(r=>{
+    const k = xlimpMatchKey(r);
+    const cur = k ? byKey.get(k) : null;
+    const base = cur ? cur : {id: uid('ship'), status:'In Process', payment:{ap:false,ar:false}, checklist:{}, bpdfData:{}, revisions:[]};
+    if(cur) kept++; else added++;
+    const s = Object.assign({}, base);
+    Object.keys(r).forEach(f=>{
+      if(f==='__payment' || f==='__sheet') return;
+      if(f==='status'){ s.status = SHIP_STATUSES.includes(r.status) ? r.status : s.status; return; }
+      s[f] = r[f];
+    });
+    if(r.__payment) s.payment = Object.assign({ap:false,ar:false}, s.payment, r.__payment);
+    if(!s.payment) s.payment = {ap:false, ar:false};
+    if(!s.id) s.id = uid('ship');
+    if(!SHIP_STATUSES.includes(s.status)) s.status = 'In Process';
+    applyAmsDefault(s);
+    syncAutoStatus(s);
+    return s;
+  });
+  shipments = next;
+  saveShipments();
+  rerenderGrid();
+  toast('📥 นำเข้า '+next.length+' แถว — อัปเดตของเดิม '+kept+' / เพิ่มใหม่ '+added+' / ลบออก '+dropped);
+};
+
 let _exportSfpFilterSale = '';
 let _exportSfpFilterFrom = '';
 let _exportSfpFilterTo = '';
