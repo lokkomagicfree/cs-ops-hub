@@ -1749,7 +1749,58 @@ function toSfpDateDisplay(isoDate){
 function cshubShipmentToSfpJob(s){
   const d = s.bpdfData || {};
   const pol = d.portLoading || s.pol || '';
-  const pod = d.finalDest || s.fpod || s.pod || '';
+  const pod = d.portDischarge || s.pod || '';
+  const del = s.fpod || d.finalDest || s.del || '';
+
+  // ── VOL ("1X20GP", "2x40HC + 1x20GP", "1x40'HQ") -> SFP container fields ──
+  const volRaw = (d.volume || s.vol || '').toString();
+  const ctnRows = [];
+  let q20=0, q40=0, q40hc=0;
+  volRaw.toUpperCase().replace(/'/g,'').split(/[+,/]/).forEach(part=>{
+    const m = part.match(/(\d+)\s*[X*]\s*(\d{2})\s*(GP|DC|HC|HQ|RF|RH|NOR|OT|FR|RQ)?/);
+    if(!m) return;
+    const qty = parseInt(m[1],10) || 0;
+    if(!qty) return;
+    const size = m[2];                       // 20 / 40 / 45
+    const kind = (m[3]||'GP').replace('DC','GP').replace('HQ','HC').replace('RH','RF');
+    ctnRows.push({type:size+kind, qty});
+    if(size==='20' && (kind==='GP'||kind==='NOR')) q20 += qty;
+    else if(size==='40' && (kind==='GP'||kind==='NOR')) q40 += qty;
+    else if(kind==='HC' || size==='45') q40hc += qty;
+  });
+  const volume = ctnRows.length ? ctnRows.map(r=>r.qty+'x'+r.type).join(' + ') : volRaw;
+
+  // ── Pick-up / Turn-in: resolve terminal name + address exactly like the PDF ──
+  const puName = terminalNameOnly(d.puTerminalId, d.puTerminalFree);
+  const tiName = terminalNameOnly(d.tiTerminalId, d.tiTerminalFree);
+  const pickupPlace = [puName, terminalAddrFor(d,'pu')].filter(Boolean).join('  ');
+  const turninAt    = [tiName, terminalAddrFor(d,'ti')].filter(Boolean).join('  ');
+
+  const carrier = s.carrier || d.carrier || '';
+  const siCut  = d.siCutoff    || toSfpDateDisplay(s.si) || '';
+  const vgmCut = d.vgmCutoff   || toSfpDateDisplay(s.vgm) || '';
+  const docCut = d.cfmBl       || toSfpDateDisplay(s.bl) || '';
+  const gateCl = d.gateClosing || toSfpDateDisplay(s.cy) || '';
+  const upPol  = (pol||'').toUpperCase();
+
+  // Sea Freight Pro restores these keys into its Booking-PDF form
+  // (BPDF_USER_FIELDS), so the 📄 PDF button works right after importing.
+  const sfpBpdf = {
+    bpdf_port_loading  : pol,
+    bpdf_port_transit  : d.portTransit || '',
+    bpdf_paperless     : d.paperless || '',
+    bpdf_pu_date       : d.puDate || '',
+    bpdf_pu_place      : pickupPlace,
+    bpdf_pu_pic        : d.puPic || '',
+    bpdf_ti_date       : d.tiDate || '',
+    bpdf_ti_at         : turninAt,
+    bpdf_ti_pic        : d.tiPic || '',
+    bpdf_commodity     : d.commodity || '',
+    bpdf_weight        : d.weight || '',
+    bpdf_hs_code       : d.hsCode || '',
+    bpdf_special_remark: d.specialRemark || '',
+  };
+
   return {
     no: s.bookingNo || ('BKG-'+uid('x').slice(-6).toUpperCase()),
     jobno: s.jobno || '',
@@ -1761,25 +1812,36 @@ function cshubShipmentToSfpJob(s){
     etd: s.etd || '', eta: s.eta || '',
     etdMonth: s.etd ? s.etd.slice(0,7) : 'Unknown',
     etaMonth: s.eta ? s.eta.slice(0,7) : 'Unknown',
-    jobType: 'export', vessel: d.vsl||s.feeder||'', motherVessel: d.motherVsl||s.motherVsl||'',
-    voyage:'', motherVoy:'', remarks: d.specialRemark||s.req||'',
+    jobType: 'export',
+    vessel: d.vsl||s.feeder||'', motherVessel: d.motherVsl||s.motherVsl||'',
+    voyage:'', motherVoy:'',
+    remarks: [d.specialRemark||s.req||'', s.hblNo?('HBL '+s.hblNo):''].filter(Boolean).join('\n'),
     csAssigned: s.cs || s.sale || '', csTasks:'',
     status: 'pending', // always Pending in Sea Freight Pro, regardless of CS Ops Hub status
-    chargeType:'',
+    chargeType:'FCL',
     sells:[], costs:[], sellsPerType:[], costsPerType:[],
     sell:0, cost:0, profit:0, margin:0, comm:0, commThb:0,
-    carrier: s.carrier || d.carrier || '', incoterm:'', consignee:'',
-    bltype:'', sc:'', ams:'', commodity: d.commodity||'', hscode: d.hsCode||'',
+    carrier, incoterm:'', consignee:'',
+    bltype:'', sc:'', ams: s.amsaci || '',
+    commodity: d.commodity||'', hscode: d.hsCode||'', hsCode: d.hsCode||'',
+    weight: d.weight || '',
     cyDate: s.cy || '', rtnDate: s.rtn || '',  // ISO (SFP CY/RTN are date inputs)
-    siCutoff: d.siCutoff || toSfpDateDisplay(s.si) || '',
-    vgmCutoff: d.vgmCutoff || toSfpDateDisplay(s.vgm) || '',
-    docCutoff: d.cfmBl || toSfpDateDisplay(s.bl) || '',
-    gateClosing: d.gateClosing || toSfpDateDisplay(s.cy) || '',
-    cyrtn:'', connote:'',
-    pol, pod, del: s.fpod || s.del || d.finalDest || '',
-    selCarrier: s.carrier||'', selLabel:'',
-    lkb:false, bkk:false,
-    ctnRows:[], q20:0, q40:0, q40hc:0,
+    siCutoff: siCut, vgmCutoff: vgmCut, docCutoff: docCut, gateClosing: gateCl,
+    cyrtn: (s.cy||s.rtn) ? ('CY '+(s.cy||'-')+' / RTN '+(s.rtn||'-')) : '',
+    connote:'',
+    pol, pod, del,
+    selCarrier: carrier,
+    selLabel: carrier ? (carrier+': '+pol+' → '+pod) : '',
+    lkb: /LAT ?KRABANG|LKB|ICD/.test(upPol), bkk: /BANGKOK|BKK/.test(upPol),
+    // Volume / containers so SFP's Ships list + TOTAL row count them
+    ctnRows, q20, q40, q40hc, volume,
+    // Booking-PDF extras (SFP shows these on its PDF form)
+    paperlessCode: d.paperless || '',
+    pickupDate: d.puDate || '', pickupPlace, pickupPic: d.puPic || '',
+    turninDate: d.tiDate || '', turninAt, turninPic: d.tiPic || '',
+    specialRemark: d.specialRemark || '',
+    portTransit: d.portTransit || '',
+    bpdfData: sfpBpdf,
     chargeNames:[], thbFlags:[], aprFlags:[],
     totalSell:0, totalCost:0,
     statusHistory:[{status:'pending', date:new Date().toISOString(), note:'Imported from CS Ops Hub'}],
