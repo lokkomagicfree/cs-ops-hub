@@ -220,6 +220,11 @@ input[type=date].gcell.is-empty:not(:focus)::-webkit-calendar-picker-indicator{o
 .ws-mi.danger:hover{background:var(--red-bg);color:var(--red)}
 .ws-mi span{font-size:10px;color:var(--muted);font-family:var(--mono)}
 .ws-msep{height:1px;background:var(--line);margin:4px 2px}
+
+.ws-rowh{cursor:grab}
+.ws-rowh:active{cursor:grabbing}
+tr.ws-drop-a td,tr.ws-drop-a th{box-shadow:inset 0 3px 0 -1px #1f6feb}
+tr.ws-drop-b td,tr.ws-drop-b th{box-shadow:inset 0 -3px 0 -1px #1f6feb}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -663,6 +668,17 @@ function applyRemoteConfig(c){
   if(Array.isArray(c.ports)) ports = c.ports;
   if(Array.isArray(c.terminals)) terminals = c.terminals;
   if(Array.isArray(c.checklistTemplates) && c.checklistTemplates.length) checklistTemplates = c.checklistTemplates;
+  // Work Sheet จากเครื่องอื่น — ไม่ทับถ้ากำลังพิมพ์อยู่
+  if(c.worksheet && c.worksheet.sheets && !wsEditing){
+    try{
+      const incoming = JSON.stringify(c.worksheet);
+      if(incoming !== JSON.stringify(wsBook)){
+        wsBook = JSON.parse(incoming);
+        if(wsActive >= wsBook.sheets.length) wsActive = 0;
+        localStorage.setItem(LS_WORKSHEET, incoming);
+      }
+    }catch(e){}
+  }
   try{ localStorage.setItem(LS_PORTS, JSON.stringify(ports)); localStorage.setItem(LS_TERMINALS, JSON.stringify(terminals)); localStorage.setItem(LS_CHECKLISTS, JSON.stringify(checklistTemplates)); }catch(e){}
   CLOUD.applyingRemote = false;
   safeRerenderActive();
@@ -699,7 +715,7 @@ function cloudSyncConfig(){
   if(!CLOUD.connected || CLOUD.applyingRemote) return;
   clearTimeout(_cloudCfgTimer);
   _cloudCfgTimer = setTimeout(async ()=>{
-    try{ const { doc, setDoc } = CLOUD.fs; await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates}); setCloudStatus('online'); }
+    try{ const { doc, setDoc } = CLOUD.fs; await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates, worksheet: wsBook||null}); setCloudStatus('online'); }
     catch(e){ setCloudStatus('error', e.message); }
   }, 800);
 }
@@ -2590,7 +2606,15 @@ function wsBindGrid(){
     if(e.target.classList.contains('ws-fbtn')){ e.preventDefault(); e.stopPropagation(); wsOpenFilter(+e.target.dataset.fc, e.target); return; }
     if(e.target.classList.contains('ws-grip')){ wsStartResize(e); return; }
     const sh = wsBook.sheets[wsActive];
-    if(rh){ wsCommitEdit(); const r=+rh.dataset.r; wsSel={r1:r,c1:0,r2:r,c2:wsCols(sh)-1}; wsAnchor={r,c:0}; wsPaintSel(); return; }
+    if(rh){
+      wsCommitEdit();
+      const r = +rh.dataset.r;
+      const R = wsRange();
+      const insideSel = R && r>=R.r1 && r<=R.r2;      // จับหัวแถวที่อยู่ในกลุ่มที่เลือก = ลากทั้งกลุ่ม
+      if(!insideSel){ wsSel={r1:r,c1:0,r2:r,c2:wsCols(sh)-1}; wsAnchor={r,c:0}; wsPaintSel(); }
+      wsBeginRowDrag(e, r);
+      return;
+    }
     if(ch){ wsCommitEdit(); const c=+ch.dataset.c; wsSel={r1:0,c1:c,r2:sh.rows.length-1,c2:c}; wsAnchor={r:0,c}; wsPaintSel(); return; }
     if(!td) return;
     if(td === wsEditing) return;                  // กำลังพิมพ์อยู่ในช่องนี้ ปล่อยให้วางเคอร์เซอร์ได้
@@ -2659,6 +2683,54 @@ function wsBindGrid(){
     if(e.key.length===1 && !e.ctrlKey && !e.metaKey && !e.altKey){ e.preventDefault(); wsBeginEdit(td, false);
       document.execCommand && document.execCommand('insertText', false, e.key); }
   });
+}
+// ── ลากแถวขึ้น-ลงด้วยเมาส์ (จับที่หัวแถว) ────────────────
+let wsRowDrag = null;
+function wsBeginRowDrag(e, r){
+  const R = wsRange();
+  const from = R ? R.r1 : r, n = R ? (R.r2-R.r1+1) : 1;
+  if(from === 0) return;                       // แถวหัวตาราง ห้ามลาก
+  wsRowDrag = {from, n, startY:e.clientY, moved:false, target:null};
+  document.addEventListener('mousemove', wsRowDragMove);
+  document.addEventListener('mouseup', wsRowDragEnd);
+  e.preventDefault();
+}
+function wsRowDragMove(e){
+  if(!wsRowDrag) return;
+  if(!wsRowDrag.moved && Math.abs(e.clientY - wsRowDrag.startY) < 4) return;
+  wsRowDrag.moved = true;
+  wsDragging = false;                          // ไม่ให้ไปลากเลือกช่องพร้อมกัน
+  document.body.style.cursor = 'grabbing';
+  const tbl = g('ws_tbl'); if(!tbl) return;
+  tbl.querySelectorAll('tr.ws-drop-a,tr.ws-drop-b').forEach(t=>t.classList.remove('ws-drop-a','ws-drop-b'));
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const tr = el && el.closest ? el.closest('#ws_tbl tbody tr') : null;
+  if(!tr) return;
+  const r = +tr.dataset.rowid;
+  if(r === 0) return;
+  const box = tr.getBoundingClientRect();
+  const after = (e.clientY - box.top) > box.height/2;
+  wsRowDrag.target = after ? r+1 : r;
+  tr.classList.add(after ? 'ws-drop-b' : 'ws-drop-a');
+}
+function wsRowDragEnd(){
+  document.removeEventListener('mousemove', wsRowDragMove);
+  document.removeEventListener('mouseup', wsRowDragEnd);
+  document.body.style.cursor = '';
+  const d = wsRowDrag; wsRowDrag = null;
+  const tbl = g('ws_tbl');
+  if(tbl) tbl.querySelectorAll('tr.ws-drop-a,tr.ws-drop-b').forEach(t=>t.classList.remove('ws-drop-a','ws-drop-b'));
+  if(!d || !d.moved || d.target==null) return;
+  let to = d.target;
+  if(to > d.from) to -= d.n;                   // ชดเชยแถวที่ถูกตัดออกไปแล้ว
+  if(to === d.from || to < 1) { if(to<1) to = 1; if(to === d.from) return; }
+  const sh = wsBook.sheets[wsActive];
+  wsPush();
+  const cut = sh.rows.splice(d.from, d.n);
+  sh.rows.splice(to, 0, ...cut);
+  wsSel = {r1:to, c1:0, r2:to+d.n-1, c2:wsCols(sh)-1}; wsAnchor = {r:to, c:0};
+  saveWorksheet(); render_worksheet();
+  toast('↕ ย้าย '+d.n+' แถวแล้ว');
 }
 // หาช่องถัดไปที่ "มองเห็น" (ข้ามแถวที่ถูกกรองซ่อน)
 function wsNextVisible(r,c,dr,dc){
