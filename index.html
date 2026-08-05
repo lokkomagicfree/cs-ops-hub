@@ -1941,12 +1941,119 @@ function cshubShipmentToSfpJob(s){
   };
 }
 
-// ── Export the shipments grid to a real .xlsx (SheetJS) ──
+// ── Export the shipments grid to .xlsx — เลือกช่วงวันที่ / Sale / CS ก่อนได้ ──
+let _xlOpt = { basis:'etd', from:'', to:'', sale:'', cs:'', status:'' };
+function xlDistinct(key){
+  return [...new Set(shipments.map(s=>(s[key]||'').toString().trim()).filter(Boolean))]
+         .sort((a,b)=>a.localeCompare(b,'th'));
+}
+function xlFiltered(){
+  const o = _xlOpt;
+  const iso = v => { const d = parseFlexibleDate(v); if(!d||isNaN(d)) return '';
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const eq = (a,b)=> (a||'').toString().trim().toLowerCase() === (b||'').toString().trim().toLowerCase();
+  return shipments.filter(s=>{
+    if(isBlankShipment(s)) return false;
+    if(o.sale   && !eq(s.sale, o.sale)) return false;
+    if(o.cs     && !eq(s.cs, o.cs)) return false;
+    if(o.status && s.status !== o.status) return false;
+    if(o.from || o.to){
+      const d = iso(s[o.basis]);
+      if(!d) return false;                       // ไม่มีวันที่ในคอลัมน์ที่เลือก = ไม่เข้าช่วง
+      if(o.from && d < o.from) return false;
+      if(o.to   && d > o.to)   return false;
+    }
+    return true;
+  }).sort((a,b)=>{
+    const k = s=>{ const dt=parseFlexibleDate(s[o.basis]); return (dt&&!isNaN(dt))?dt.getTime():Infinity; };
+    return k(a)-k(b);
+  });
+}
 window.exportShipmentsExcel = function(){
   if(!window.XLSX){ toast('⏳ กำลังโหลดตัวสร้าง Excel… ลองอีกครั้ง'); return; }
-  const etdKey = s=>{ const dt=parseFlexibleDate(s.etd); return (dt && !isNaN(dt)) ? dt.getTime() : Infinity; };
-  const list = shipments.filter(s=>!isBlankShipment(s)).slice().sort((a,b)=> etdKey(a)-etdKey(b));
-  if(!list.length){ toast('ไม่มีข้อมูลให้ export'); return; }
+  g('xl_modal')?.remove();
+  const sales = xlDistinct('sale'), css = xlDistinct('cs');
+  const opt = (v,label,cur)=>`<option value="${escapeHtml(v)}"${v===cur?' selected':''}>${escapeHtml(label)}</option>`;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay open" id="xl_modal" style="z-index:960">
+      <div class="modal" style="max-width:560px">
+        <div class="modal-head"><h2>📊 Export Excel</h2>
+          <button class="btn-icon" onclick="g('xl_modal').remove()">✕</button></div>
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="inp-group"><label class="inp-lbl">ใช้วันที่จาก</label>
+              <select class="inp" id="xl_basis" onchange="xlSet('basis',this.value)">
+                ${opt('etd','ETD',_xlOpt.basis)}${opt('eta','ETA',_xlOpt.basis)}
+                ${opt('cy','CY',_xlOpt.basis)}${opt('si','SI',_xlOpt.basis)}${opt('bl','BL',_xlOpt.basis)}
+              </select></div>
+            <div class="inp-group"><label class="inp-lbl">สถานะ</label>
+              <select class="inp" id="xl_status" onchange="xlSet('status',this.value)">
+                ${opt('','ทั้งหมด',_xlOpt.status)}${SHIP_STATUSES.map(s=>opt(s,s,_xlOpt.status)).join('')}
+              </select></div>
+            <div class="inp-group"><label class="inp-lbl">ตั้งแต่วันที่</label>
+              <input type="date" class="inp" id="xl_from" value="${_xlOpt.from}" onchange="xlSet('from',this.value)"></div>
+            <div class="inp-group"><label class="inp-lbl">ถึงวันที่</label>
+              <input type="date" class="inp" id="xl_to" value="${_xlOpt.to}" onchange="xlSet('to',this.value)"></div>
+            <div class="inp-group"><label class="inp-lbl">Sale</label>
+              <select class="inp" id="xl_sale" onchange="xlSet('sale',this.value)">
+                ${opt('','ทั้งหมด ('+sales.length+' คน)',_xlOpt.sale)}${sales.map(s=>opt(s,s,_xlOpt.sale)).join('')}
+              </select></div>
+            <div class="inp-group"><label class="inp-lbl">CS</label>
+              <select class="inp" id="xl_cs" onchange="xlSet('cs',this.value)">
+                ${opt('','ทั้งหมด ('+css.length+' คน)',_xlOpt.cs)}${css.map(s=>opt(s,s,_xlOpt.cs)).join('')}
+              </select></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+            <button class="btn btn-ghost btn-sm" onclick="xlQuick('month')">เดือนนี้</button>
+            <button class="btn btn-ghost btn-sm" onclick="xlQuick('lastmonth')">เดือนที่แล้ว</button>
+            <button class="btn btn-ghost btn-sm" onclick="xlQuick('week')">7 วันข้างหน้า</button>
+            <button class="btn btn-ghost btn-sm" onclick="xlQuick('clear')">ล้างช่วงวันที่</button>
+          </div>
+          <div id="xl_count" style="margin-top:12px;font-size:12px;color:var(--teal-dk);background:var(--teal-bg);
+            border:1px solid var(--teal);border-radius:8px;padding:8px 10px"></div>
+        </div>
+        <div class="modal-foot" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px">
+          <button class="btn btn-ghost" onclick="g('xl_modal').remove()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="xlDoExport()">📊 Export</button>
+        </div>
+      </div>
+    </div>`);
+  xlUpdateCount();
+};
+window.xlSet = function(k,v){ _xlOpt[k]=v; xlUpdateCount(); };
+window.xlQuick = function(kind){
+  const d = new Date(), p = n=>String(n).padStart(2,'0');
+  const iso = x => x.getFullYear()+'-'+p(x.getMonth()+1)+'-'+p(x.getDate());
+  if(kind==='clear'){ _xlOpt.from=''; _xlOpt.to=''; }
+  else if(kind==='month'){
+    _xlOpt.from = iso(new Date(d.getFullYear(), d.getMonth(), 1));
+    _xlOpt.to   = iso(new Date(d.getFullYear(), d.getMonth()+1, 0));
+  } else if(kind==='lastmonth'){
+    _xlOpt.from = iso(new Date(d.getFullYear(), d.getMonth()-1, 1));
+    _xlOpt.to   = iso(new Date(d.getFullYear(), d.getMonth(), 0));
+  } else if(kind==='week'){
+    _xlOpt.from = iso(d);
+    _xlOpt.to   = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate()+7));
+  }
+  const f=g('xl_from'), t=g('xl_to');
+  if(f) f.value=_xlOpt.from; if(t) t.value=_xlOpt.to;
+  xlUpdateCount();
+};
+function xlUpdateCount(){
+  const el = g('xl_count'); if(!el) return;
+  const n = xlFiltered().length;
+  const o = _xlOpt;
+  const parts = [];
+  if(o.from||o.to) parts.push(o.basis.toUpperCase()+' '+(o.from||'…')+' → '+(o.to||'…'));
+  if(o.sale)   parts.push('Sale: '+o.sale);
+  if(o.cs)     parts.push('CS: '+o.cs);
+  if(o.status) parts.push('สถานะ: '+o.status);
+  el.innerHTML = `จะ export <b>${n}</b> รายการ` + (parts.length?` · ${escapeHtml(parts.join(' · '))}`:' · ทั้งหมด');
+  if(!n) el.innerHTML += ' — <span style="color:var(--red)">ไม่พบข้อมูลตามเงื่อนไข</span>';
+}
+window.xlDoExport = function(){
+  const list = xlFiltered();
+  if(!list.length){ toast('ไม่มีข้อมูลตามเงื่อนไขที่เลือก'); return; }
   const cols = GRID_COLS;
   const header = cols.map(c=> c.k==='__payment' ? 'Payment (AP/AR)' : c.label).concat(['Status']);
   const rows = list.map(s=>{
@@ -1958,18 +2065,19 @@ window.exportShipmentsExcel = function(){
     r.push(s.status||'');
     return r;
   });
-  const aoa = [header, ...rows];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws['!cols'] = header.map((h,i)=>{
     let w = String(h).length;
     rows.forEach(r=>{ const L = String(r[i]==null?'':r[i]).length; if(L>w) w=L; });
     return { wch: Math.min(40, Math.max(10, w+2)) };
   });
-  ws['!freeze'] = { xSplit:0, ySplit:1 }; // keep header row visible
+  ws['!freeze'] = { xSplit:0, ySplit:1 };
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Shipments');
-  const today = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `CS_Shipments_${today}.xlsx`);
+  const o=_xlOpt, tag = [o.sale||'', (o.from||o.to)?((o.from||'')+'_'+(o.to||'')):''].filter(Boolean).join('_')
+              || new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `CS_Shipments_${tag.replace(/[^\w\-.]+/g,'-')}.xlsx`);
+  g('xl_modal')?.remove();
   toast('📊 Export Excel แล้ว ('+list.length+' รายการ)');
 };
 
