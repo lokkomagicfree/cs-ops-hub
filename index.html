@@ -576,8 +576,10 @@ async function connectCloud(cfg){
         CLOUD.firstShipSnap = true; _syncedShip = {};
         startCloudListeners();
         setCloudStatus('online');
-        try{ commApplyVisibility(); commConnectSFP(false); }catch(e){}
+        try{ commApplyVisibility(); commConnectSFP(false); commWatchFines(); }catch(e){}
       }else{
+        try{ CLOUD.unsubComm && CLOUD.unsubComm(); }catch(e){}
+        CLOUD.unsubComm = null;
         try{ commApplyVisibility(); }catch(e){}
         CLOUD.connected = false;
         try{ CLOUD.unsubShip && CLOUD.unsubShip(); CLOUD.unsubCfg && CLOUD.unsubCfg(); }catch(e){}
@@ -2622,7 +2624,9 @@ document.addEventListener('paste', e=>{
 // ดึงค่าคอมรายเดือนของ PAE จาก Sea Freight Pro (โปรเจกต์ sea-freight-pro)
 // แบบเรียลไทม์ผ่าน sharedCommission/pae
 // ════════════════════════════════════════════════════════════
-const COMM_VIEWER_EMAIL = 'toontenitis@gmail.com';
+// SALE PAE เป็นเจ้าของยอดขาย เห็นได้ทุกอย่างในระบบ · FILM เห็นเฉพาะหน้านี้
+const COMM_VIEWERS = ['thmunpukdee@gmail.com',   // PAE  (Sale) — เห็นทุกอย่าง
+                      'toontenitis@gmail.com'];  // FILM — เจ้าของค่าคอมที่คำนวณจากยอด PAE
 const COMM_SOURCE_EMAIL = 'thmunpukdee@gmail.com';
 const COMM_START_MONTH  = '2026-06';        // เริ่มแสดงตั้งแต่ JUN 2026
 const COMM_TAX_RATE     = 0.03;             // หักภาษี 3%
@@ -2657,7 +2661,7 @@ try{ COMM_DATA = JSON.parse(localStorage.getItem(LS_COMM_CACHE)||'{}'); }catch(e
 function commEmail(){
   try{ return ((CLOUD.user && CLOUD.user.email) || '').toLowerCase(); }catch(e){ return ''; }
 }
-function commAllowed(){ return commEmail() === COMM_VIEWER_EMAIL; }
+function commAllowed(){ return COMM_VIEWERS.indexOf(commEmail()) >= 0; }
 window.commAllowed = commAllowed;
 function commApplyVisibility(){
   const on = commAllowed();
@@ -2688,12 +2692,38 @@ function commRows(){
 }
 window.commRows = commRows;
 
+let _commFineTimer = null;
 window.commSetFine = function(key, val){
   const v = String(val==null?'':val).replace(/[^\d.\-]/g,'');
   if(v==='' || isNaN(parseFloat(v))) delete COMM_FINE[key]; else COMM_FINE[key] = parseFloat(v);
   try{ localStorage.setItem(LS_COMM_FINE, JSON.stringify(COMM_FINE)); }catch(e){}
   commPaintTotals();
+  clearTimeout(_commFineTimer);
+  _commFineTimer = setTimeout(commPushFines, 800);   // ให้ทั้ง FILM และ PAE เห็นเลขเดียวกัน
 };
+// ค่าปรับเก็บบนคลาวด์ของ CS Hub (แชร์ระหว่างบัญชีที่ดูหน้านี้ได้)
+async function commPushFines(){
+  if(!CLOUD.connected || !CLOUD.fs) return;
+  try{
+    const { doc, setDoc } = CLOUD.fs;
+    await setDoc(doc(CLOUD.db, metaColl(), 'commission'),
+      { fines: COMM_FINE, updatedAt: new Date().toISOString(), by: commEmail() }, {merge:true});
+  }catch(e){ console.warn('commPushFines', e); }
+}
+function commWatchFines(){
+  if(!CLOUD.fs || CLOUD.unsubComm) return;
+  const { doc, onSnapshot } = CLOUD.fs;
+  CLOUD.unsubComm = onSnapshot(doc(CLOUD.db, metaColl(), 'commission'), d=>{
+    if(d.metadata && d.metadata.hasPendingWrites) return;   // ข้ามของที่เราเพิ่งเขียนเอง
+    if(!d.exists || !d.exists()) return;
+    const f = (d.data()||{}).fines;
+    if(!f || JSON.stringify(f)===JSON.stringify(COMM_FINE)) return;
+    COMM_FINE = f;
+    try{ localStorage.setItem(LS_COMM_FINE, JSON.stringify(COMM_FINE)); }catch(e){}
+    if(g('page-commission')?.classList.contains('active')) render_commission();
+  }, ()=>{});
+}
+window.commWatchFines = commWatchFines;
 // อัปเดตเฉพาะตัวเลขที่เปลี่ยน ไม่ re-render ทั้งหน้า (ไม่ให้ช่องที่กำลังพิมพ์หลุดโฟกัส)
 function commPaintTotals(){
   const rows = commRows();
@@ -2778,7 +2808,7 @@ function render_commission(){
   const el = g('page-commission'); if(!el) return;
   if(!commAllowed()){
     el.innerHTML = `<div class="card" style="padding:24px;text-align:center;color:var(--muted)">
-      หน้านี้เปิดให้เฉพาะบัญชี <b>${COMM_VIEWER_EMAIL}</b> เท่านั้น<br>
+      หน้านี้เปิดให้เฉพาะบัญชี <b>${COMM_VIEWERS.join(' และ ')}</b> เท่านั้น<br>
       <span style="font-size:12px">บัญชีที่ใช้อยู่: ${commEmail()||'(ยังไม่ได้ลงชื่อเข้าใช้)'}</span></div>`;
     return;
   }
@@ -2792,6 +2822,8 @@ function render_commission(){
       <div style="flex:1;min-width:260px">
         <div style="font-size:12px;color:var(--muted)">แหล่งข้อมูล: ค่าคอมของ <b>${COMM_SOURCE_EMAIL}</b> (SALE PAE)</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${live} · อัปเดตล่าสุด ${upd}</div>
+        <div style="font-size:11px;margin-top:3px">กำลังดูในชื่อ <b>${commEmail()}</b>
+          <span style="color:var(--teal)">${commEmail()===COMM_SOURCE_EMAIL?'(SALE PAE — เห็นทุกอย่าง)':'(FILM)'}</span></div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="commConnectSFP(true)">🔄 ดึงข้อมูลใหม่</button>
     </div>
@@ -2843,7 +2875,7 @@ function render_commission(){
     </div>
 
     <div style="font-size:11px;color:var(--muted);margin-top:10px">
-      * ค่าปรับที่กรอกเก็บไว้ในเครื่องนี้เท่านั้น · ตัวเลขค่าคอม PAE ดึงสดจาก Sea Freight Pro ไม่ได้แก้ที่นี่
+      * ค่าปรับที่กรอกจะซิงก์ให้ทั้ง FILM และ PAE เห็นตรงกัน · ตัวเลขค่าคอม PAE ดึงสดจาก Sea Freight Pro ไม่ได้แก้ที่นี่
     </div>`;
   commPaintTotals();
 }
