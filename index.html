@@ -2529,25 +2529,55 @@ window.wsPasteFromClipboard = async function(){
 function wsPasteText(txt){
   const R = wsRange(); if(!R) return;
   const sh = wsBook.sheets[wsActive];
-  const lines = String(txt).replace(/\r/g,'').replace(/\n$/,'').split('\n').map(l=>l.split('\t'));
-  wsPush();
-  const srcR = lines.length, srcC = lines[0].length;
+  const lines = String(txt).replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(l=>l.split('\t'));
+  const srcR = lines.length, srcC = Math.max(...lines.map(l=>l.length));
+  if(!srcR || !srcC) return;
   const selR = R.r2-R.r1+1, selC = R.c2-R.c1+1;
-  // คัดลอกช่องเดียว (หรือบล็อกเล็กกว่า) แล้วคุมดำหลายช่อง → วางซ้ำเต็มพื้นที่ที่เลือก เหมือน Excel
-  const fill = (selR>srcR || selC>srcC) && (selR*selC > 1);
-  const rowsN = fill ? selR : srcR;
-  const colsN = fill ? selC : srcC;
-  for(let i=0;i<rowsN;i++){
-    for(let j=0;j<colsN;j++){
-      const v = lines[i % srcR][j % srcC];
-      const r = R.r1+i, c = R.c1+j;
+
+  // ── วางซ้ำเต็มพื้นที่ที่เลือก เฉพาะตอนที่เป็น "จำนวนเท่าพอดี" เหมือน Excel ──
+  // (ก่อนหน้านี้ซ้ำทุกกรณี → เลือกทั้งคอลัมน์แล้ววาง = ล้นลงไปทั้งคอลัมน์)
+  let exactMultiple = selR%srcR===0 && selC%srcC===0 && (selR>srcR || selC>srcC);
+  // เผลอเลือกทั้งคอลัมน์แล้ววาง = เขียนทับเป็นร้อยแถว → ถามก่อน
+  if(exactMultiple && (selR*selC) > (srcR*srcC) + 10){
+    if(!confirm('จะวางซ้ำเต็มพื้นที่ที่เลือก '+selR+' แถว × '+selC+' คอลัมน์\n'
+              + '(ข้อมูลที่คัดลอกมามีแค่ '+srcR+' แถว × '+srcC+' คอลัมน์)\n\n'
+              + 'OK = วางซ้ำเต็มพื้นที่   |   Cancel = วางแค่ขนาดที่คัดลอกมา'))
+      exactMultiple = false;
+  }
+  const rowsN = exactMultiple ? selR : srcR;
+  const colsN = exactMultiple ? selC : srcC;
+
+  // แถวที่ถูกกรองซ่อนอยู่ ตอน copy ไม่ได้ติดไปด้วย ตอนวางก็ต้องข้ามเหมือนกัน
+  // ไม่งั้นค่าจะไปตกผิดแถว
+  const hidden = wsHiddenRows(sh);
+  const targets = [];
+  for(let r=R.r1; r<sh.rows.length && targets.length<rowsN; r++){
+    if(!hidden.has(r)) targets.push(r);
+  }
+  const maxC = wsCols(sh);
+  const clampedC = Math.min(colsN, Math.max(1, maxC - R.c1));   // ไม่ล้นเกินคอลัมน์สุดท้าย
+  const spillR = rowsN - targets.length, spillC = colsN - clampedC;
+
+  wsPush();
+  targets.forEach((r,i)=>{
+    for(let j=0;j<clampedC;j++){
+      const line = lines[i % srcR] || [];
+      const v = line[j % srcC];
+      const c = R.c1+j;
       const [,sid] = wsCell(sh.rows[r]||[], c);
       wsSet(sh, r, c, String(v==null?'':v).trim(), sid);   // วางทับค่า แต่คงสีเดิมของช่องไว้
     }
-  }
-  wsSel = {r1:R.r1, c1:R.c1, r2:R.r1+rowsN-1, c2:R.c1+colsN-1};
-  saveWorksheet(); render_worksheet();
-  toast('📋 วาง '+rowsN+' แถว × '+colsN+' คอลัมน์');
+  });
+
+  // เลือกเฉพาะบล็อกที่วางจริง แล้ววาดทับในที่เดิม — ไม่ re-render ทั้งหน้า (จอจะได้ไม่เด้ง)
+  const lastR = targets.length ? targets[targets.length-1] : R.r1;
+  wsSel = {r1:R.r1, c1:R.c1, r2:lastR, c2:R.c1+clampedC-1};
+  wsScheduleSave();
+  targets.forEach(r=>{ for(let j=0;j<clampedC;j++) wsRepaintCell(r, R.c1+j); });
+  wsPaintSel();
+  toast('📋 วาง '+targets.length+' แถว × '+clampedC+' คอลัมน์'
+    + (spillR>0 ? ' · ตัดออก '+spillR+' แถว (เกินท้ายตาราง/แถวที่ถูกกรอง)' : '')
+    + (spillC>0 ? ' · ตัดออก '+spillC+' คอลัมน์ (เกินคอลัมน์สุดท้าย)' : ''));
 }
 // ตัวจัดการระดับหน้า — ทำงานเมื่ออยู่หน้า Work Sheet และเลือกช่องไว้ (ไม่ต้องคลิกเข้าช่องก่อน)
 function wsClipboardActive(){
@@ -2580,14 +2610,26 @@ document.addEventListener('paste', e=>{
 // ── render ──────────────────────────────────────────────
 let _wsScroll = {t:0, l:0};
 function wsKeepScroll(){
-  const w = g('ws_wrap'); if(w){ _wsScroll = {t:w.scrollTop, l:w.scrollLeft}; }
+  const w = g('ws_wrap');
+  _wsScroll = { t: w?w.scrollTop:0, l: w?w.scrollLeft:0,
+                py: window.pageYOffset || document.documentElement.scrollTop || 0 };
 }
 function wsRestoreScroll(){
   const w = g('ws_wrap'); if(w){ w.scrollTop = _wsScroll.t; w.scrollLeft = _wsScroll.l; }
+  // คืนตำแหน่ง scroll ของทั้งหน้าด้วย — ตอน re-render กล่องยุบชั่วขณะ หน้าจะเด้งขึ้นบน
+  if(_wsScroll.py != null){
+    const py = _wsScroll.py;
+    window.scrollTo(0, py);
+    requestAnimationFrame(()=>window.scrollTo(0, py));
+  }
 }
 function render_worksheet(){
   if(!wsBook) loadWorksheet();
   wsKeepScroll();
+  // ล็อกความสูงไว้ก่อนล้าง innerHTML ไม่ให้หน้ายุบแล้วเด้ง
+  const _pgEl = g('page-worksheet');
+  const _hOld = _pgEl ? _pgEl.offsetHeight : 0;
+  if(_pgEl && _hOld) _pgEl.style.minHeight = _hOld+'px';
   g('topbar_actions').innerHTML =
     `<button class="btn btn-ghost" onclick="wsImportXlsx()">📥 Import Excel</button>`+
     `<button class="btn btn-ghost" onclick="wsExportXlsx()">📊 Export Excel</button>`;
@@ -2669,6 +2711,7 @@ function render_worksheet(){
   wsPaintSel();
   wsInfo();
   wsRestoreScroll();
+  if(_pgEl) requestAnimationFrame(()=>{ _pgEl.style.minHeight = ''; });
 }
 function wsInfo(){
   const sh = wsBook.sheets[wsActive];
@@ -2689,7 +2732,7 @@ function wsCommitEdit(){
   const r = +td.dataset.r, c = +td.dataset.c;
   const [old, sid] = wsCell(sh.rows[r]||[], c);
   const val = td.textContent.replace(/ /g,' ').trim();
-  if(val !== old){ wsPush(); wsSet(sh, r, c, val, sid); saveWorksheet(); }
+  if(val !== old){ wsPush(); wsSet(sh, r, c, val, sid); wsScheduleSave(); }
   td.textContent = val;
 }
 function wsBeginEdit(td, keepText){
@@ -2697,7 +2740,7 @@ function wsBeginEdit(td, keepText){
   wsCommitEdit();
   wsEditing = td;
   td.contentEditable = 'true';
-  td.focus();
+  td.focus({preventScroll:true});
   const sel = window.getSelection(); const rng = document.createRange();
   rng.selectNodeContents(td);
   if(keepText) rng.collapse(false);      // F2 = วางเคอร์เซอร์ท้ายข้อความ
@@ -2776,7 +2819,7 @@ function wsBindGrid(){
       if(e.key==='Enter'){ e.preventDefault(); wsCommitEdit(); return move(1,0); }
       if(e.key==='Tab'){ e.preventDefault(); wsCommitEdit(); return move(0, e.shiftKey?-1:1); }
       if(e.key==='Escape'){ e.preventDefault(); const sh=wsBook.sheets[wsActive];
-        td.textContent = wsCell(sh.rows[r]||[], c)[0]; wsEditing=null; td.contentEditable='false'; td.focus(); }
+        td.textContent = wsCell(sh.rows[r]||[], c)[0]; wsEditing=null; td.contentEditable='false'; td.focus({preventScroll:true}); }
       return;                       // ระหว่างพิมพ์ ปล่อยปุ่มอื่นให้แก้ข้อความตามปกติ
     }
     if(e.altKey && (e.key==='ArrowUp'||e.key==='ArrowDown')){ e.preventDefault(); return wsMoveRow(e.key==='ArrowUp'?-1:1); }
@@ -3149,7 +3192,15 @@ document.addEventListener('keydown', function(e){
   if(!pg || !pg.classList.contains('active')) return;
   const mod = e.ctrlKey || e.metaKey;
   const inInput = e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA';
-  if(e.key==='Escape'){ g('ws_filter_pop')?.remove(); g('ws_menu')?.remove(); return; }
+  if(e.key==='Escape'){
+    g('ws_filter_pop')?.remove(); g('ws_menu')?.remove();
+    if(!wsEditing && wsSel){                       // ยกเลิกการคุมดำ (ตัวคุมค้างอยู่ตอนวางเสร็จ)
+      e.preventDefault();
+      wsSel = null; wsAnchor = null; wsPaintSel(); wsInfo();
+      try{ document.activeElement && document.activeElement.blur(); }catch(_e){}
+    }
+    return;
+  }
   if(wsEditing && !mod) return;                 // กำลังพิมพ์ในช่อง → ปล่อยให้พิมพ์ตามปกติ
   if(e.altKey && (e.key==='ArrowUp'||e.key==='ArrowDown')){ e.preventDefault(); return window.wsMoveRow(e.key==='ArrowUp'?-1:1); }
   if(inInput && !(mod && e.key.toLowerCase()==='s')) return;
