@@ -2677,6 +2677,24 @@ const MONTH_TH = ['','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT'
 function commMonthLabel(k){ const [y,m]=String(k).split('-'); return (MONTH_TH[+m]||m)+' '+y; }
 
 // แถวสรุปของแต่ละเดือน
+// เดือนที่ได้รับเงินจริง — ผ่านมาแล้ว/ใกล้ถึง/ยังอีกนาน
+function commDueColor(iso){
+  if(!iso) return 'var(--muted)';
+  const d = new Date(iso+'T00:00:00'); if(isNaN(d)) return 'var(--muted)';
+  const diff = Math.ceil((d - new Date())/86400000);
+  if(diff < 0)  return 'var(--green)';
+  if(diff <= 31) return 'var(--amber)';
+  return 'var(--slate)';
+}
+function commDueNote(iso){
+  if(!iso) return '';
+  const d = new Date(iso+'T00:00:00'); if(isNaN(d)) return '';
+  const diff = Math.ceil((d - new Date())/86400000);
+  if(diff < 0)  return 'ถึงกำหนดแล้ว';
+  if(diff === 0) return 'วันนี้';
+  return 'อีก '+diff+' วัน';
+}
+
 function commRows(){
   const keys = Object.keys(COMM_DATA).filter(k=> k >= COMM_START_MONTH).sort();
   return keys.map(k=>{
@@ -2687,7 +2705,9 @@ function commRows(){
     const fine  = Number(COMM_FINE[k])||0;
     const net   = Math.round((gr.gross - tax - fine)*100)/100;
     return { key:k, label:commMonthLabel(k), paeComm:pae, jobs:src.jobs||0,
-             gross:gr.gross, remain:gr.remain, parts:gr.parts, tax, fine, net };
+             gross:gr.gross, remain:gr.remain, parts:gr.parts, tax, fine, net,
+             isActual: !!src.isActual, autoThb: src.autoThb, basisThb: src.basisThb,
+             due: src.dueLabel||'', dueISO: src.dueISO||'' };
   });
 }
 window.commRows = commRows;
@@ -2745,7 +2765,7 @@ function commPaintTotals(){
   const f = g('comm_foot');
   if(f){
     const sum = k => rows.reduce((s,r)=>s+r[k],0);
-    f.innerHTML = `<td style="padding:10px 12px;font-weight:700">รวม ${rows.length} เดือน</td>
+    f.innerHTML = `<td style="padding:10px 12px;font-weight:700">รวม ${rows.length} เดือน</td><td></td>
       <td style="text-align:right;padding:10px 12px;font-weight:700">${commTHB(sum('paeComm'))}</td>
       <td style="text-align:right;padding:10px 12px;font-weight:700;color:var(--teal)">${commTHB(sum('gross'))}</td>
       <td style="text-align:right;padding:10px 12px;color:var(--red)">-${commTHB(sum('tax'))}</td>
@@ -2860,7 +2880,9 @@ function render_commission(){
         ทุก <b>50,000 ฿</b> → <b>2,000 ฿</b> ·
         ทุก <b>30,000 ฿</b> → <b>1,000 ฿</b> (คิดจากขั้นใหญ่ลงมา เศษที่ไม่ถึง 30,000 ไม่คิด)<br>
         ตัวอย่าง: PAE ได้ 180,000 → 100,000(5,000) + 50,000(2,000) + 30,000(1,000) = <b>8,000 ฿</b><br>
-        แล้ว <b>หักภาษี 3%</b> และ <b>หักค่าปรับ</b> (กรอกเองในตาราง) · จ่ายพร้อมรอบของ PAE
+        แล้ว <b>หักภาษี 3%</b> และ <b>หักค่าปรับ</b> (กรอกเองในตาราง) · จ่ายพร้อมรอบของ PAE<br>
+        <span style="color:var(--teal)">ยอดจริง</span> = PAE กรอกกำไร THB ของเดือนนั้นเองใน Sea Freight Pro (คอลัมน์ COMM จาก THB) ·
+        <span style="color:var(--muted)">ระบบคำนวณ</span> = ยังไม่ได้กรอก ใช้ยอดที่ระบบคิดให้ไปก่อน
       </div>
     </div>
 
@@ -2868,7 +2890,8 @@ function render_commission(){
       <div style="overflow-x:auto">
       <table class="tbl" style="width:100%;min-width:860px;border-collapse:collapse">
         <thead><tr style="background:var(--card2)">
-          <th style="text-align:left;padding:10px 12px">เดือน</th>
+          <th style="text-align:left;padding:10px 12px">เดือนงาน</th>
+          <th style="text-align:center;padding:10px 12px">ได้รับเดือน</th>
           <th style="text-align:right;padding:10px 12px">ค่าคอม PAE (฿)</th>
           <th style="text-align:right;padding:10px 12px">ค่าคอม FILM (฿)</th>
           <th style="text-align:right;padding:10px 12px">หักภาษี 3%</th>
@@ -2880,7 +2903,12 @@ function render_commission(){
           <tr style="border-top:1px solid var(--line)">
             <td style="padding:10px 12px;font-weight:600">${r.label}
               <div style="font-size:10px;color:var(--muted)">${r.jobs} งาน</div></td>
-            <td style="text-align:right;padding:10px 12px;font-family:var(--mono)">${commTHB(r.paeComm)}</td>
+            <td style="text-align:center;padding:10px 12px;font-family:var(--mono);font-size:12px;color:${commDueColor(r.dueISO)}">
+              ${r.due||'—'}<div style="font-size:9px;color:var(--muted)">${commDueNote(r.dueISO)}</div></td>
+            <td style="text-align:right;padding:10px 12px;font-family:var(--mono)">${commTHB(r.paeComm)}
+              <div style="font-size:9px;color:${r.isActual?'var(--teal)':'var(--muted)'}">${
+                r.isActual ? ('ยอดจริง'+(r.basisThb!=null?(' · จากกำไร '+commTHB(r.basisThb)+' ฿'):''))
+                           : 'ระบบคำนวณ'}</div></td>
             <td style="text-align:right;padding:10px 12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${commTHB(r.gross)}
               <div style="font-size:10px;color:var(--muted);font-weight:400">${r.parts.length?r.parts.join(' + '):'ยังไม่ถึงขั้นต่ำ 30,000'}${r.remain?(' · เศษ '+commTHB(r.remain)):''}</div></td>
             <td style="text-align:right;padding:10px 12px;font-family:var(--mono);color:var(--red)" id="comm_tax_${r.key}">${commTHB(r.tax)}</td>
