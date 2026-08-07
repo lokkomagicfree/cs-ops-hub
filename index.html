@@ -960,6 +960,11 @@ const GRID_COLS = [
   {k:'motherVsl',  label:'Mother Vessel', type:'text', w:160},
 ];
 
+// คอลัมน์ที่โชว์ในหน้า Shipments (Actions กับ Status วาดแยกอยู่แล้ว)
+// ข้อมูลช่องอื่นไม่ได้ถูกลบ — ยัง import/export และใช้ในหน้า Documents ได้ครบเหมือนเดิม
+const SHIP_VISIBLE = ['bookingNo','jobno','custRef','sale','cs'];
+const SHIP_COLS = SHIP_VISIBLE.map(k=>GRID_COLS.find(c=>c.k===k)).filter(Boolean);
+
 function rememberScroll(){ const w=g('ship_grid_wrap'); if(w) _shipScrollLeft=w.scrollLeft; }
 function scheduleSave(){ clearTimeout(_gridSaveTimer); _gridSaveTimer=setTimeout(saveShipments, 400); }
 
@@ -1317,7 +1322,7 @@ function render_shipments(){
       if(!txt.includes(q)) return false;
     }
     // per-column Excel-style filters (chosen value sets)
-    for(const c of GRID_COLS){
+    for(const c of SHIP_COLS){
       const f = _colFilters[c.k];
       if(Array.isArray(f) && f.length && !f.includes(getColDisplay(s,c))) return false;
     }
@@ -1337,7 +1342,7 @@ function render_shipments(){
   let cutoffDue = 0;
   activeShips.forEach(s=>CUTOFF_DEFS.forEach(d=>{ const v=s[d.key]; if(v && cutoffUrgency(v).hoursLeft<=72) cutoffDue++; }));
 
-  const headCells = GRID_COLS.map(c=>`<th>${escapeHtml(c.label)}${colFilterControl(c)}</th>`).join('');
+  const headCells = SHIP_COLS.map(c=>`<th>${escapeHtml(c.label)}${colFilterControl(c)}</th>`).join('');
 
   g('page-shipments').innerHTML = `
     <div class="card" style="margin-bottom:14px">
@@ -1367,12 +1372,12 @@ function render_shipments(){
           <tbody>
             ${view.map(({s,idx})=>`<tr class="${s.status==='Completed'?'row-done':''}">
               ${rowLeadHtml(idx,s)}
-              ${GRID_COLS.map(c=>gridCellHtml(idx,s,c)).join('')}
+              ${SHIP_COLS.map(c=>gridCellHtml(idx,s,c)).join('')}
               <td class="no-print"><select class="gcell" style="min-width:152px" onchange="changeShipmentStatus(${idx},this.value)">${SHIP_STATUSES.map(st=>`<option ${s.status===st?'selected':''}>${st}</option>`).join('')}</select></td>
             </tr>`).join('')}
             <tr class="grid-newrow">
               <td class="no-print" style="color:var(--teal-dk);font-size:10px;text-align:center;font-weight:700">+ ใหม่</td>
-              ${GRID_COLS.map(c=>gridNewCellHtml(c)).join('')}
+              ${SHIP_COLS.map(c=>gridNewCellHtml(c)).join('')}
               <td></td>
             </tr>
           </tbody>
