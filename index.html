@@ -576,10 +576,10 @@ async function connectCloud(cfg){
         CLOUD.firstShipSnap = true; _syncedShip = {};
         startCloudListeners();
         setCloudStatus('online');
-        try{ commApplyVisibility(); commConnectSFP(false); commWatchFines(); }catch(e){}
+        try{ commApplyVisibility(); commConnectSFP(false); commWatchFines(); sfpRemarksWatchLocal(); }catch(e){}
       }else{
-        try{ CLOUD.unsubComm && CLOUD.unsubComm(); }catch(e){}
-        CLOUD.unsubComm = null;
+        try{ CLOUD.unsubComm && CLOUD.unsubComm(); CLOUD.unsubRem && CLOUD.unsubRem(); }catch(e){}
+        CLOUD.unsubComm = null; CLOUD.unsubRem = null;
         try{ commApplyVisibility(); }catch(e){}
         CLOUD.connected = false;
         try{ CLOUD.unsubShip && CLOUD.unsubShip(); CLOUD.unsubCfg && CLOUD.unsubCfg(); }catch(e){}
@@ -962,8 +962,24 @@ const GRID_COLS = [
 
 // คอลัมน์ที่โชว์ในหน้า Shipments (Actions กับ Status วาดแยกอยู่แล้ว)
 // ข้อมูลช่องอื่นไม่ได้ถูกลบ — ยัง import/export และใช้ในหน้า Documents ได้ครบเหมือนเดิม
-const SHIP_VISIBLE = ['bookingNo','jobno','custRef','sale','cs'];
-const SHIP_COLS = SHIP_VISIBLE.map(k=>GRID_COLS.find(c=>c.k===k)).filter(Boolean);
+const SHIP_VISIBLE = ['bookingNo','custRef','sale','cs'];
+const SFP_REMARK_COL = {k:'__sfpRemark', label:'Remark (SFP)', type:'sfpremark', w:300};
+const SHIP_COLS = SHIP_VISIBLE.map(k=>GRID_COLS.find(c=>c.k===k)).filter(Boolean).concat([SFP_REMARK_COL]);
+
+// Remark ที่ดึงมาจาก Sea Freight Pro — คีย์ด้วยเลข Booking
+let SFP_REMARKS = {};
+try{ SFP_REMARKS = JSON.parse(localStorage.getItem('cshub_sfp_remarks_v1')||'{}'); }catch(e){ SFP_REMARKS = {}; }
+const _bkNorm = v => String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'')
+  .replace(/^(COSU|WHLC|ONEY|OOLU|MAEU|MSCU|HLCU|YMLU|ZIMU|HDMU|EGLV|CMDU)/,'');
+function sfpRemarkOf(sh){
+  if(!sh) return '';
+  const direct = SFP_REMARKS[String(sh.bookingNo||'').trim()];
+  if(direct) return direct;
+  const want = _bkNorm(sh.bookingNo);
+  if(!want) return '';
+  for(const k in SFP_REMARKS){ if(_bkNorm(k) === want) return SFP_REMARKS[k]; }
+  return '';
+}
 
 function rememberScroll(){ const w=g('ship_grid_wrap'); if(w) _shipScrollLeft=w.scrollLeft; }
 function scheduleSave(){ clearTimeout(_gridSaveTimer); _gridSaveTimer=setTimeout(saveShipments, 400); }
@@ -1220,6 +1236,11 @@ function gridCellHtml(idx, s, col){
     }
     return `<td class="no-print ${tdcls}" style="text-align:center"><div style="display:flex;align-items:center;justify-content:center;gap:3px">${warn}<button class="apar-cell" style="margin:0" onclick="openPaymentModal(${idx})" title="AP จ่ายค่าเรือ / AR เก็บเงินลูกค้า"><span class="apar-badge ${p.ap?'on':''}">AP</span><span class="apar-badge ${p.ar?'on':''}">AR</span></button></div></td>`;
   }
+  if(col.type==='sfpremark'){
+    const v = sfpRemarkOf(s);
+    return `<td style="max-width:${col.w}px" title="${escapeHtml(v||'ยังไม่มี remark ใน Sea Freight Pro')}">
+      <div style="font-size:12px;line-height:1.45;white-space:pre-wrap;color:${v?'var(--ink)':'var(--muted)'};max-height:44px;overflow:hidden">${v?escapeHtml(v):'—'}</div></td>`;
+  }
   if(col.type==='select'){
     const v = s[col.k]||'';
     let tdcls='', warnIcon='';
@@ -1252,6 +1273,7 @@ function gridCellHtml(idx, s, col){
 }
 
 function gridNewCellHtml(col){
+  if(col.type==='sfpremark') return `<td style="color:var(--muted);font-size:11px">— จาก SFP —</td>`;
   if(col.type==='payment') return `<td></td>`;
   if(col.type==='select'){
     const opts = col.options.map(o=>`<option value="${escapeHtml(o)}">${o===''?'—':escapeHtml(o)}</option>`).join('');
@@ -1367,18 +1389,15 @@ function render_shipments(){
           <thead><tr>
             <th class="no-print" style="vertical-align:top">Actions</th>
             ${headCells}
-            <th class="no-print" style="vertical-align:top">Status${colFilterControl(STATUS_COL)}</th>
           </tr></thead>
           <tbody>
             ${view.map(({s,idx})=>`<tr class="${s.status==='Completed'?'row-done':''}">
               ${rowLeadHtml(idx,s)}
               ${SHIP_COLS.map(c=>gridCellHtml(idx,s,c)).join('')}
-              <td class="no-print"><select class="gcell" style="min-width:152px" onchange="changeShipmentStatus(${idx},this.value)">${SHIP_STATUSES.map(st=>`<option ${s.status===st?'selected':''}>${st}</option>`).join('')}</select></td>
             </tr>`).join('')}
             <tr class="grid-newrow">
               <td class="no-print" style="color:var(--teal-dk);font-size:10px;text-align:center;font-weight:700">+ ใหม่</td>
               ${SHIP_COLS.map(c=>gridNewCellHtml(c)).join('')}
-              <td></td>
             </tr>
           </tbody>
         </table>
@@ -2832,9 +2851,45 @@ async function commMirrorToCsHub(){
   }catch(e){ console.warn('commMirrorToCsHub', e); }
 }
 
+// ── Remark จาก Sea Freight Pro ────────────────────────────
+// เครื่องที่ต่อ SFP ได้จะอ่านแล้วมิเรอร์ลง Firestore ของ CS Hub
+// คนอื่นอ่านจากมิเรอร์ ไม่ต้องมีสิทธิ์เข้าโปรเจกต์ SFP
+let _remUnsub = null;
+function sfpRemarksApply(map, mirror){
+  if(!map || JSON.stringify(map)===JSON.stringify(SFP_REMARKS)) return;
+  SFP_REMARKS = map;
+  try{ localStorage.setItem('cshub_sfp_remarks_v1', JSON.stringify(map)); }catch(e){}
+  if(mirror) sfpRemarksMirror();
+  if(g('page-shipments')?.classList.contains('active')) { rememberScroll(); render_shipments(); }
+}
+async function sfpRemarksMirror(){
+  if(!CLOUD.connected || !CLOUD.fs) return;
+  try{
+    const { doc, setDoc } = CLOUD.fs;
+    await setDoc(doc(CLOUD.db, metaColl(), 'sfpRemarks'),
+      { map: SFP_REMARKS, updatedAt: new Date().toISOString(), by: commEmail() }, {merge:true});
+  }catch(e){ console.warn('sfpRemarksMirror', e); }
+}
+function sfpRemarksWatchLocal(){          // อ่านมิเรอร์จาก CS Hub เอง (ทุกบัญชี)
+  if(!CLOUD.fs || CLOUD.unsubRem) return;
+  const { doc, onSnapshot } = CLOUD.fs;
+  CLOUD.unsubRem = onSnapshot(doc(CLOUD.db, metaColl(), 'sfpRemarks'), d=>{
+    if(d.metadata && d.metadata.hasPendingWrites) return;
+    if(!d.exists || !d.exists()) return;
+    sfpRemarksApply((d.data()||{}).map, false);
+  }, ()=>{});
+}
+window.sfpRemarksWatchLocal = sfpRemarksWatchLocal;
+
 function commWatch(){
   if(!_commApp || _commUnsub) return;
   const { doc, onSnapshot } = _commApp.fs;
+  if(!_remUnsub){
+    _remUnsub = onSnapshot(doc(_commApp.db, 'sharedRates', 'shipment_remarks'), snap=>{
+      if(!snap.exists || !snap.exists()) return;
+      sfpRemarksApply((snap.data()||{}).map, true);
+    }, err=> console.warn('sfp remarks watch', err));
+  }
   _commUnsub = onSnapshot(doc(_commApp.db, 'sharedRates', 'commission_pae'), snap=>{
     if(!snap.exists || !snap.exists()){ COMM_LIVE = true; return; }
     const d = snap.data() || {};
