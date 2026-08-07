@@ -2622,7 +2622,7 @@ document.addEventListener('paste', e=>{
 // COMMISSION — ค่าคอมของ FILM ที่ได้จากยอดค่าคอมของ SALE PAE
 // เห็นได้เฉพาะบัญชี toontenitis@gmail.com เท่านั้น
 // ดึงค่าคอมรายเดือนของ PAE จาก Sea Freight Pro (โปรเจกต์ sea-freight-pro)
-// แบบเรียลไทม์ผ่าน sharedCommission/pae
+// แบบเรียลไทม์ผ่าน sharedRates/commission_pae (path ที่ Firestore rules อนุญาต)
 // ════════════════════════════════════════════════════════════
 // SALE PAE เป็นเจ้าของยอดขาย เห็นได้ทุกอย่างในระบบ · FILM เห็นเฉพาะหน้านี้
 const COMM_VIEWERS = ['thmunpukdee@gmail.com',   // PAE  (Sale) — เห็นทุกอย่าง
@@ -2716,11 +2716,21 @@ function commWatchFines(){
   CLOUD.unsubComm = onSnapshot(doc(CLOUD.db, metaColl(), 'commission'), d=>{
     if(d.metadata && d.metadata.hasPendingWrites) return;   // ข้ามของที่เราเพิ่งเขียนเอง
     if(!d.exists || !d.exists()) return;
-    const f = (d.data()||{}).fines;
-    if(!f || JSON.stringify(f)===JSON.stringify(COMM_FINE)) return;
-    COMM_FINE = f;
-    try{ localStorage.setItem(LS_COMM_FINE, JSON.stringify(COMM_FINE)); }catch(e){}
-    if(g('page-commission')?.classList.contains('active')) render_commission();
+    const dd = d.data()||{};
+    let changed = false;
+    if(dd.fines && JSON.stringify(dd.fines)!==JSON.stringify(COMM_FINE)){
+      COMM_FINE = dd.fines;
+      try{ localStorage.setItem(LS_COMM_FINE, JSON.stringify(COMM_FINE)); }catch(e){}
+      changed = true;
+    }
+    // ยอดค่าคอมที่ PAE มิเรอร์มาให้ — ใช้เฉพาะตอนที่เครื่องนี้ต่อ SFP เองไม่ได้
+    if(!COMM_LIVE && dd.months && JSON.stringify(dd.months)!==JSON.stringify(COMM_DATA)){
+      COMM_DATA = dd.months;
+      COMM_META = { updatedAt: dd.monthsUpdatedAt, owner: COMM_SOURCE_EMAIL, mirroredBy: dd.mirroredBy };
+      try{ localStorage.setItem(LS_COMM_CACHE, JSON.stringify(COMM_DATA)); }catch(e){}
+      changed = true;
+    }
+    if(changed && g('page-commission')?.classList.contains('active')) render_commission();
   }, ()=>{});
 }
 window.commWatchFines = commWatchFines;
@@ -2786,16 +2796,28 @@ window.commConnectSFP = async function(manual){
   _commBusy = false;
 };
 
+// มิเรอร์ข้อมูลจาก SFP ลง Firestore ของ CS Hub — ทำโดยเครื่องที่ต่อ SFP ได้ (ปกติคือ PAE)
+async function commMirrorToCsHub(){
+  if(!CLOUD.connected || !CLOUD.fs || !COMM_DATA) return;
+  try{
+    const { doc, setDoc } = CLOUD.fs;
+    await setDoc(doc(CLOUD.db, metaColl(), 'commission'),
+      { months: COMM_DATA, monthsUpdatedAt: (COMM_META.updatedAt||new Date().toISOString()),
+        mirroredBy: commEmail(), mirroredAt: new Date().toISOString() }, {merge:true});
+  }catch(e){ console.warn('commMirrorToCsHub', e); }
+}
+
 function commWatch(){
   if(!_commApp || _commUnsub) return;
   const { doc, onSnapshot } = _commApp.fs;
-  _commUnsub = onSnapshot(doc(_commApp.db, 'sharedCommission', 'pae'), snap=>{
+  _commUnsub = onSnapshot(doc(_commApp.db, 'sharedRates', 'commission_pae'), snap=>{
     if(!snap.exists || !snap.exists()){ COMM_LIVE = true; return; }
     const d = snap.data() || {};
     COMM_DATA = d.months || {};
     COMM_META = { updatedAt: d.updatedAt, owner: d.owner, commMode: d.commMode };
     COMM_LIVE = true;
     try{ localStorage.setItem(LS_COMM_CACHE, JSON.stringify(COMM_DATA)); }catch(e){}
+    commMirrorToCsHub();      // ส่งต่อให้ FILM อ่านได้โดยไม่ต้องเข้าโปรเจกต์ SFP
     if(g('page-commission')?.classList.contains('active')) render_commission();
   }, err=>{
     COMM_LIVE = false;
@@ -2814,8 +2836,11 @@ function render_commission(){
   }
   const rows = commRows();
   const upd  = COMM_META.updatedAt ? new Date(COMM_META.updatedAt).toLocaleString('th-TH') : '—';
-  const live = COMM_LIVE ? '<span style="color:var(--green)">● เชื่อมต่อ Sea Freight Pro แล้ว</span>'
-                         : '<span style="color:var(--amber)">◌ ยังไม่เชื่อมต่อ — กดปุ่มด้านขวา</span>';
+  const live = COMM_LIVE
+    ? '<span style="color:var(--green)">● ต่อ Sea Freight Pro โดยตรง</span>'
+    : (COMM_META.mirroredBy
+        ? '<span style="color:var(--teal)">● รับข้อมูลผ่าน '+COMM_META.mirroredBy+'</span>'
+        : '<span style="color:var(--amber)">◌ ยังไม่มีข้อมูล — ให้ PAE เปิดหน้านี้สักครั้ง</span>');
 
   el.innerHTML = `
     <div class="card" style="padding:14px 16px;margin-bottom:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
