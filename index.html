@@ -2555,12 +2555,52 @@ function wsCopyFallback(txt, done){
   ta.remove();
 }
 window.wsPasteFromClipboard = async function(){
+  if(!wsRange()) return toast('คลิกช่องที่จะวางก่อนครับ');
   let txt = '';
   try{ if(navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); }catch(e){}
   if(!txt) txt = _wsClip || '';
-  if(!txt) return toast('ไม่มีข้อมูลใน clipboard — ลองกด Ctrl/⌘+V แทนครับ');
-  wsPasteText(txt);
+  if(txt) return wsPasteText(txt);
+  wsPastePrompt();          // อ่าน clipboard ไม่ได้ (เบราว์เซอร์ไม่ให้สิทธิ์) → เปิดกล่องให้วางเอง
 };
+// กล่องวางสำรอง — ใช้ได้เสมอ ไม่ต้องขอสิทธิ์อะไรทั้งนั้น
+function wsPastePrompt(){
+  const R = wsRange(); if(!R) return toast('คลิกช่องที่จะวางก่อนครับ');
+  g('ws_paste_box')?.remove();
+  const bx = document.createElement('div');
+  bx.id = 'ws_paste_box';
+  bx.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,25,35,.35);'
+                   + 'display:flex;align-items:center;justify-content:center';
+  bx.innerHTML =
+    '<div style="background:#fff;border-radius:12px;padding:16px;width:min(560px,92vw);'
+    + 'box-shadow:0 18px 50px rgba(0,0,0,.25);font-family:inherit">'
+    + '<div style="font-weight:600;margin-bottom:4px">📋 วางข้อมูลลงชีต</div>'
+    + '<div style="font-size:12px;color:#6b7a8c;margin-bottom:9px">'
+    + 'คลิกในกล่องข้างล่าง แล้วกด <b>Ctrl/⌘+V</b> — จะวางลงช่องที่เลือกไว้ให้เลย</div>'
+    + '<textarea id="ws_paste_ta" style="width:100%;height:150px;border:1px solid #cfd6dd;border-radius:8px;'
+    + 'padding:8px;font:12px/1.45 ui-monospace,monospace;resize:vertical" '
+    + 'placeholder="วางตรงนี้ (Ctrl/⌘+V)"></textarea>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">'
+    + '<button id="ws_paste_cancel" class="btn btn-ghost btn-sm">ยกเลิก</button>'
+    + '<button id="ws_paste_ok" class="btn btn-sm" style="background:#0f6fa8;color:#fff">วางเลย</button>'
+    + '</div></div>';
+  document.body.appendChild(bx);
+  const ta = g('ws_paste_ta');
+  const close = ()=> bx.remove();
+  const doPaste = ()=>{
+    const v = ta.value;
+    close();
+    if(!v.trim()) return toast('ยังไม่มีข้อมูลในกล่องครับ');
+    wsSel = {r1:R.r1, c1:R.c1, r2:R.r2, c2:R.c2};      // คืนช่องที่เลือกไว้ก่อนเปิดกล่อง
+    wsPasteText(v);
+  };
+  g('ws_paste_cancel').onclick = close;
+  g('ws_paste_ok').onclick = doPaste;
+  bx.addEventListener('click', e=>{ if(e.target===bx) close(); });
+  ta.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+  ta.addEventListener('paste', ()=> setTimeout(doPaste, 0));   // วางแล้วลงชีตทันที ไม่ต้องกดปุ่มซ้ำ
+  setTimeout(()=>ta.focus(), 30);
+}
+window.wsPastePrompt = wsPastePrompt;
 function wsPasteText(txt){
   const R = wsRange(); if(!R) return;
   const sh = wsBook.sheets[wsActive];
@@ -2641,6 +2681,77 @@ document.addEventListener('paste', e=>{
   e.preventDefault();
   wsPasteText(txt);
 });
+
+// ── สะพาน clipboard ของจริง (แก้ปัญหา copy แล้ววางไม่ได้) ─────────────
+// ช่องในตารางเป็น user-select:none และ <td> แก้ข้อความไม่ได้ → Chrome
+// จะ "ไม่ยิง" event copy/cut/paste เลย (พิสูจน์แล้วบนเว็บจริง: กด Ctrl+C
+// ไม่มี event ใดๆ เกิดขึ้น) ตัวจัดการ 3 ตัวข้างบนจึงไม่เคยถูกเรียก
+// ทางแก้ที่ใช้กันในตารางออนไลน์ทุกเจ้า: มี <textarea> ซ่อนไว้คอยรับแทน
+//   Ctrl/⌘+C  → ยัด TSV ลงกล่องซ่อน + select() แล้วปล่อยให้เบราว์เซอร์ copy เอง
+//   Ctrl/⌘+V  → โฟกัสกล่องซ่อนไว้ก่อน แล้วอ่านค่าจาก event paste ของกล่องนั้น
+// วิธีนี้ได้ clipboard ของระบบจริง (วางลง Excel ได้) และไม่ต้องขอ permission
+let _wsIO = null, _wsIOBack = null, _wsIOTimer = null, _wsIOWaiting = false;
+function wsIOBox(){
+  if(_wsIO && _wsIO.isConnected) return _wsIO;
+  const ta = document.createElement('textarea');
+  ta.id = 'ws_clipio';
+  ta.setAttribute('aria-hidden','true'); ta.tabIndex = -1;
+  ta.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;padding:0;border:0;'
+                   + 'opacity:0;z-index:-1;pointer-events:none;resize:none';
+  ta.addEventListener('paste', ev=>{
+    ev.preventDefault();
+    _wsIOWaiting = false;
+    const txt = (ev.clipboardData||window.clipboardData).getData('text') || _wsClip || '';
+    wsIOReturn();
+    if(txt) wsPasteText(txt); else toast('คลิปบอร์ดว่างอยู่ครับ');
+  });
+  document.body.appendChild(ta);
+  _wsIO = ta; return ta;
+}
+function wsIOReturn(){                      // คืนโฟกัสกลับไปที่ช่องเดิม
+  clearTimeout(_wsIOTimer);
+  const td = _wsIOBack; _wsIOBack = null;
+  if(_wsIO) _wsIO.value = '';
+  if(td && td.isConnected){ try{ td.focus({preventScroll:true}); }catch(e){} }
+}
+document.addEventListener('keydown', function(e){
+  const mod = e.ctrlKey || e.metaKey;
+  if(!mod || e.altKey) return;
+  const k = (typeof wsKey==='function') ? wsKey(e) : (e.key||'').toLowerCase();
+  if(k!=='c' && k!=='x' && k!=='v') return;
+  if(!wsClipboardActive()) return;
+
+  const ta = wsIOBox();
+  const ae = document.activeElement;
+  _wsIOBack = (ae && ae.tagName==='TD') ? ae : null;
+  clearTimeout(_wsIOTimer);
+
+  if(k === 'v'){                                // ปล่อยให้ระบบวางลงกล่องซ่อน
+    ta.value = '';
+    ta.focus({preventScroll:true});
+    _wsIOWaiting = true;
+    // ถ้าเบราว์เซอร์ไม่ยอมส่ง event paste มาเลย → เปิดกล่องวางสำรองให้แทน
+    _wsIOTimer = setTimeout(()=>{
+      if(!_wsIOWaiting) return;
+      _wsIOWaiting = false; wsIOReturn();
+      if(_wsClip) wsPasteText(_wsClip); else wsPastePrompt();
+    }, 400);
+    return;
+  }
+  _wsIOTimer = setTimeout(wsIOReturn, 1200);   // กันโฟกัสค้าง
+  const txt = wsSelText();
+  if(!txt){ wsIOReturn(); return toast('เลือกช่องก่อนครับ'); }
+  _wsClip = txt;
+  ta.value = txt;
+  ta.focus({preventScroll:true});
+  ta.select();                                  // ปล่อยให้เบราว์เซอร์ copy/cut เอง
+  const R = wsRange(), nR = txt.split('\n').length, nC = txt.split('\n')[0].split('\t').length;
+  setTimeout(()=>{
+    wsIOReturn();
+    if(k === 'x'){ wsClearCells(); toast('✂ ตัด '+nR+' แถว × '+nC+' คอลัมน์ — วางได้ทั้งในชีตนี้และ Excel'); }
+    else toast('⧉ คัดลอก '+nR+' แถว × '+nC+' คอลัมน์ — วางได้ทั้งในชีตนี้และ Excel');
+  }, 0);
+}, true);
 
 // ════════════════════════════════════════════════════════════
 // COMMISSION — ค่าคอมของ FILM ที่ได้จากยอดค่าคอมของ SALE PAE
@@ -3064,6 +3175,10 @@ function render_worksheet(){
         <button class="btn btn-ghost btn-sm" onclick="wsToggleBold()"><b>B</b></button>
         <button class="btn btn-ghost btn-sm" onclick="wsApplyText('FF0000')" style="color:#c1402f">A</button>
         <button class="btn btn-ghost btn-sm" onclick="wsClearFormat()">ล้างสี</button>
+      </div>
+      <div class="ws-grp">
+        <button class="btn btn-ghost btn-sm" onclick="wsCopySel()" title="คัดลอกช่องที่เลือก (Ctrl/⌘+C)">⧉ คัดลอก</button>
+        <button class="btn btn-ghost btn-sm" onclick="wsPasteFromClipboard()" title="วางลงช่องที่เลือก (Ctrl/⌘+V)">📋 วาง</button>
       </div>
       <div class="ws-grp">
         <button class="btn btn-ghost btn-sm" onclick="wsUndoAct()" title="Ctrl/⌘+Z">↩</button>
