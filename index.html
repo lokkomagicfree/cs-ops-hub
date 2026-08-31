@@ -679,15 +679,11 @@ function applyRemoteConfig(c){
   if(Array.isArray(c.ports)) ports = c.ports;
   if(Array.isArray(c.terminals)) terminals = c.terminals;
   if(Array.isArray(c.checklistTemplates) && c.checklistTemplates.length) checklistTemplates = c.checklistTemplates;
-  // Work Sheet จากเครื่องอื่น — ไม่ทับถ้ากำลังพิมพ์อยู่
-  if(c.worksheet && c.worksheet.sheets && !wsEditing){
+  // Work Sheet ไม่อยู่ใน config อีกแล้ว — แยกเป็นสมุดของแต่ละคน (doc: worksheet_<email>)
+  // ของเก่าที่ยังค้างอยู่ใน config ให้เก็บไว้เป็นต้นฉบับสำหรับคนที่ยังไม่เคยเปิด เท่านั้น
+  if(c.worksheet && c.worksheet.sheets){
     try{
-      const incoming = JSON.stringify(c.worksheet);
-      if(incoming !== JSON.stringify(wsBook)){
-        wsBook = JSON.parse(incoming);
-        if(wsActive >= wsBook.sheets.length) wsActive = 0;
-        localStorage.setItem(LS_WORKSHEET, incoming);
-      }
+      if(!localStorage.getItem(LS_WORKSHEET)) localStorage.setItem(LS_WORKSHEET, JSON.stringify(c.worksheet));
     }catch(e){}
   }
   try{ localStorage.setItem(LS_PORTS, JSON.stringify(ports)); localStorage.setItem(LS_TERMINALS, JSON.stringify(terminals)); localStorage.setItem(LS_CHECKLISTS, JSON.stringify(checklistTemplates)); }catch(e){}
@@ -726,7 +722,7 @@ function cloudSyncConfig(){
   if(!CLOUD.connected || CLOUD.applyingRemote) return;
   clearTimeout(_cloudCfgTimer);
   _cloudCfgTimer = setTimeout(async ()=>{
-    try{ const { doc, setDoc } = CLOUD.fs; await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates, worksheet: wsBook||null}); setCloudStatus('online'); }
+    try{ const { doc, setDoc } = CLOUD.fs; await setDoc(doc(CLOUD.db,metaColl(),'config'), {ports, terminals, checklistTemplates}); setCloudStatus('online'); }
     catch(e){ setCloudStatus('error', e.message); }
   }, 800);
 }
@@ -2122,7 +2118,14 @@ const WS_SEED = {"styles":[{"bg":"00B0F0","fg":null,"b":0},{"bg":"FF0000","fg":n
 // แก้ไขได้เหมือน Excel: พิมพ์ในช่อง, ระบายสี, แทรก/ลบแถว-คอลัมน์, สลับชีต
 // เก็บใน localStorage · export กลับเป็น .xlsx ได้
 // ═══════════════════════════════════════════════════════
-const LS_WORKSHEET = 'cshub_worksheet_v1';
+const LS_WORKSHEET = 'cshub_worksheet_v1';          // สมุดรวมของเดิม (ใช้เป็นต้นฉบับตอนย้าย)
+// ── Work Sheet แยกสมุดตาม CS แต่ละคน (28 ส.ค. 2026) ──────────────
+//    ต่างคนต่างสมุด เห็นแค่ของตัวเอง · ผูกกับอีเมลที่ล็อกอิน
+function wsEmail(){
+  try{ return String((CLOUD && CLOUD.user && CLOUD.user.email) || '').toLowerCase(); }catch(e){ return ''; }
+}
+function wsLsKey(){ const e=wsEmail(); return e ? ('cshub_worksheet_v1__'+e) : LS_WORKSHEET; }
+function wsDocId(){ const e=wsEmail(); return 'worksheet_'+e.replace(/[^a-z0-9]/g,'_'); }
 const WS_PALETTE = [
   {c:'', n:'ไม่มีสี'},
   {c:'FFFF00', n:'เหลือง'},
@@ -2139,6 +2142,8 @@ let wsSel = null;          // {r1,c1,r2,c2}
 let wsFilters = {};        // { sheetIndex: { colIndex: [ค่าที่ติ๊กไว้] } } — เหมือน AutoFilter ใน Excel
 let wsSorts = {};          // { sheetIndex: {col,dir} } — จำว่าเรียงคอลัมน์ไหนอยู่
 const LS_WS_BAK = 'cshub_worksheet_bak_v1';   // สำรองอัตโนมัติ 20 เวอร์ชันล่าสุด
+const LS_WS_GONE = 'cshub_worksheet_gone_v1'; // ชีตที่ผู้ใช้ตั้งใจลบ ห้ามกู้กลับมาเอง
+function wsGoneKey(){ const e=wsEmail(); return e ? (LS_WS_GONE+'__'+e) : LS_WS_GONE; }
 let wsUndo = [], wsRedo = [], wsTyping = null;
 let wsAnchor = null;
 let wsDragging = false;
@@ -2175,7 +2180,18 @@ function wsStyleId(bg, fg, b){
 function wsColLetter(i){ let s=''; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
 
 function loadWorksheet(){
-  try{ wsBook = JSON.parse(localStorage.getItem(LS_WORKSHEET)||'null'); }catch(e){ wsBook=null; }
+  const KEY = wsLsKey();
+  try{ wsBook = JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ wsBook=null; }
+  // เปิดครั้งแรกของอีเมลนี้ -> คัดลอกสมุดรวมเดิมมาให้ทั้งเล่ม แล้วค่อยไปลบชีตที่ไม่ใช่ของตัวเองทีหลัง
+  if((!wsBook || !Array.isArray(wsBook.sheets) || !wsBook.sheets.length) && KEY!==LS_WORKSHEET){
+    try{
+      const shared = JSON.parse(localStorage.getItem(LS_WORKSHEET)||'null');
+      if(shared && Array.isArray(shared.sheets) && shared.sheets.length){
+        wsBook = JSON.parse(JSON.stringify(shared));
+        try{ localStorage.setItem(KEY, JSON.stringify(wsBook)); }catch(e){}
+      }
+    }catch(e){}
+  }
   if(!wsBook || !Array.isArray(wsBook.sheets) || !wsBook.sheets.length){
     wsBook = JSON.parse(JSON.stringify(WS_SEED));
   }
@@ -2184,9 +2200,11 @@ function loadWorksheet(){
   // โดยไม่แตะชีตที่แก้ไขไว้แล้ว
   try{
     const have = new Set(wsBook.sheets.map(x=>x.name));
+    let gone = [];
+    try{ gone = JSON.parse(localStorage.getItem(wsGoneKey())||'[]'); }catch(e){ gone = []; }
     const back = [];
     WS_SEED.sheets.forEach(seed=>{
-      if(have.has(seed.name)) return;
+      if(have.has(seed.name) || gone.indexOf(seed.name)>=0) return;
       const cp = JSON.parse(JSON.stringify(seed));
       // สีของชีตต้นฉบับอ้างอิง WS_SEED.styles → ย้าย style เข้ามาในเล่มปัจจุบัน
       const remap = new Map();
@@ -2202,7 +2220,7 @@ function loadWorksheet(){
       wsBook.sheets.push(cp); back.push(seed.name);
     });
     if(back.length){
-      try{ localStorage.setItem(LS_WORKSHEET, JSON.stringify(wsBook)); }catch(e){}
+      try{ localStorage.setItem(wsLsKey(), JSON.stringify(wsBook)); }catch(e){}
       setTimeout(()=>toast('♻️ กู้ชีตที่หายกลับมาแล้ว: '+back.join(', ')), 800);
     }
   }catch(e){}
@@ -2210,10 +2228,60 @@ function loadWorksheet(){
 }
 function saveWorksheet(){
   try{ wsBackup(); }catch(e){}
-  try{ localStorage.setItem(LS_WORKSHEET, JSON.stringify(wsBook)); }
+  try{ localStorage.setItem(wsLsKey(), JSON.stringify(wsBook)); }
   catch(e){ toast('❌ บันทึกไม่สำเร็จ: '+e.message); }
-  if(typeof cloudSyncConfig==='function'){ try{ cloudSyncConfig(); }catch(e){} }
+  wsCloudPush();
 }
+// สมุดของแต่ละคนเก็บแยก document ไม่ปนกับ config ที่ทั้งทีมใช้ร่วมกัน
+let _wsCloudTimer=null, _wsCloudHash='';
+function wsCloudPush(){
+  if(!CLOUD.connected || CLOUD.applyingRemote || !wsEmail()) return;
+  clearTimeout(_wsCloudTimer);
+  _wsCloudTimer = setTimeout(async ()=>{
+    try{
+      const body = JSON.stringify(wsBook);
+      if(body === _wsCloudHash) return;
+      const { doc, setDoc } = CLOUD.fs;
+      await setDoc(doc(CLOUD.db, metaColl(), wsDocId()),
+                   { owner: wsEmail(), updatedAt: new Date().toISOString(), book: body });
+      _wsCloudHash = body;
+      setCloudStatus('online');
+    }catch(e){ setCloudStatus('error', e.message); }
+  }, 900);
+}
+async function wsCloudPull(){
+  try{
+    if(!CLOUD.connected || !wsEmail()) return;
+    const { doc, getDoc } = CLOUD.fs;
+    const d = await getDoc(doc(CLOUD.db, metaColl(), wsDocId()));
+    if(d && d.exists()){
+      const raw = d.data() && d.data().book;
+      if(raw && raw !== JSON.stringify(wsBook) && !wsEditing){
+        wsBook = JSON.parse(raw); _wsCloudHash = raw;
+        if(wsActive >= wsBook.sheets.length) wsActive = 0;
+        try{ localStorage.setItem(wsLsKey(), raw); }catch(e){}
+        if(g('page-worksheet') && g('page-worksheet').classList.contains('active')) render_worksheet();
+      }
+    } else {
+      saveWorksheet();          // ยังไม่มีบน cloud -> อัปสมุดที่ copy มาขึ้นไปให้
+    }
+  }catch(e){}
+}
+window.wsCloudPull = wsCloudPull;
+// auth มาหลัง script เสมอ -> ตอนเปิดหน้าใหม่ยังไม่รู้ว่าใคร ต้องเฝ้าดูแล้วสลับสมุดให้
+let _wsKeyEmail = '';
+function wsSwitchAccount(){
+  const e = wsEmail();
+  if(e === _wsKeyEmail) return;
+  _wsKeyEmail = e;
+  _wsCloudHash = '';
+  try{ loadWorksheet(); }catch(err){}
+  if(g('page-worksheet') && g('page-worksheet').classList.contains('active')){
+    try{ render_worksheet(); }catch(err){}
+  }
+  if(e) wsCloudPull();
+}
+setInterval(wsSwitchAccount, 1500);
 function wsScheduleSave(){ clearTimeout(wsSaveTimer); wsSaveTimer = setTimeout(saveWorksheet, 400); }
 
 // ── Undo / Redo + สำรองอัตโนมัติ ─────────────────────────
@@ -3166,7 +3234,11 @@ function render_worksheet(){
   const swatches = WS_PALETTE.map(p=>
     `<button class="ws-sw" title="${p.n}" data-bg="${p.c}" onclick="wsApplyFill('${p.c}')" style="background:${p.c?'#'+p.c:'#fff'}${p.c?'':';background-image:linear-gradient(45deg,transparent 45%,#c1402f 45%,#c1402f 55%,transparent 55%)'}"></button>`).join('');
   const tabs = wsBook.sheets.map((s,i)=>
-    `<button class="ws-tab ${i===wsActive?'on':''}" onclick="wsGoSheet(${i})" ondblclick="wsRenameSheet(${i})">${escapeHtml(s.name)}</button>`).join('');
+    `<button class="ws-tab ${i===wsActive?'on':''}" onclick="wsGoSheet(${i})"
+       ondblclick="wsRenameSheet(${i})"
+       oncontextmenu="event.preventDefault();wsRenameSheet(${i})"
+       title="คลิกเพื่อเปิดชีต · ดับเบิลคลิกหรือคลิกขวาเพื่อเปลี่ยนชื่อ">${escapeHtml(s.name)}${
+       i===wsActive?' <span style="opacity:.55;font-size:11px">✏️</span>':''}</button>`).join('');
 
   g('page-worksheet').innerHTML = `
     <div class="ws-bar">
@@ -3206,8 +3278,12 @@ function render_worksheet(){
         <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
     </div>
     <div class="ws-tabs">${tabs}
-      <button class="ws-tab add" onclick="wsAddSheet()">＋</button>
+      <button class="ws-tab add" onclick="wsAddSheet()" title="เพิ่มชีตใหม่">＋</button>
+      <button class="ws-tab add" onclick="wsRenameSheet(wsActive)" title="เปลี่ยนชื่อชีตนี้">✏️</button>
       <button class="ws-tab add" onclick="wsDeleteSheet()" title="ลบชีตนี้">🗑</button>
+      <span style="margin-left:10px;font-size:11.5px;color:var(--muted)">${
+        wsEmail() ? ('📒 สมุดของ '+escapeHtml(wsEmail())+' — คนอื่นมองไม่เห็น')
+                  : '⚠ ยังไม่ได้ลงชื่อเข้าใช้ — กำลังใช้สมุดชั่วคราวของเครื่องนี้'}</span>
     </div>`;
   wsBindGrid();
   wsPaintSel();
@@ -3588,8 +3664,11 @@ window.wsRenameSheet = function(i){
 };
 window.wsDeleteSheet = function(){
   if(wsBook.sheets.length<=1) return toast('ต้องเหลืออย่างน้อย 1 ชีต');
-  if(!confirm('ลบชีต "'+wsBook.sheets[wsActive].name+'"?')) return;
+  const dead = wsBook.sheets[wsActive].name;
+  if(!confirm('ลบชีต "'+dead+'"?')) return;
   wsPush();
+  try{ const gone=JSON.parse(localStorage.getItem(wsGoneKey())||'[]');
+       if(gone.indexOf(dead)<0){ gone.push(dead); localStorage.setItem(wsGoneKey(), JSON.stringify(gone)); } }catch(e){}
   wsBook.sheets.splice(wsActive,1);
   wsActive = Math.max(0, wsActive-1); wsSel=null; saveWorksheet(); render_worksheet();
 };
