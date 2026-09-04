@@ -2137,6 +2137,13 @@ const WS_PALETTE = [
   {c:'CCD4DE', n:'เทา'},
 ];
 let wsBook = null;
+/* ── ดูสมุดของ CS คนอื่นได้ (อ่านอย่างเดียว) ─────────────────────────
+   สมุดเก็บแยกคนละ doc: <prefix>_meta/worksheet_<email>  ฟิลด์ {owner, updatedAt, book}
+   wsView = อีเมลที่กำลังเปิดดู ('' = สมุดของตัวเอง)
+   เปิดของคนอื่น = อ่านอย่างเดียวเสมอ ห้ามเขียนทับของเขา */
+let wsView = '';            // อีเมลเจ้าของสมุดที่กำลังดู
+let wsOwners = [];          // [{email, updatedAt}] จาก cloud
+function wsRO(){ return !!wsView && wsView !== wsEmail(); }
 let wsActive = 0;
 let wsSel = null;          // {r1,c1,r2,c2}
 let wsFilters = {};        // { sheetIndex: { colIndex: [ค่าที่ติ๊กไว้] } } — เหมือน AutoFilter ใน Excel
@@ -2156,6 +2163,7 @@ function wsCell(row, c){
   return [String(v),0];
 }
 function wsSet(sh, r, c, txt, sid){
+  if(wsRO()) return;                 // ดูของคนอื่นอยู่ ห้ามแก้
   while(sh.rows.length<=r) sh.rows.push([]);
   const row = sh.rows[r];
   while(row.length<=c) row.push(0);
@@ -2227,6 +2235,7 @@ function loadWorksheet(){
   if(wsActive >= wsBook.sheets.length) wsActive = 0;
 }
 function saveWorksheet(){
+  if(wsRO()) return;                 // ดูของคนอื่นอยู่ ห้ามเขียนทับ
   try{ wsBackup(); }catch(e){}
   try{ localStorage.setItem(wsLsKey(), JSON.stringify(wsBook)); }
   catch(e){ toast('❌ บันทึกไม่สำเร็จ: '+e.message); }
@@ -2235,7 +2244,7 @@ function saveWorksheet(){
 // สมุดของแต่ละคนเก็บแยก document ไม่ปนกับ config ที่ทั้งทีมใช้ร่วมกัน
 let _wsCloudTimer=null, _wsCloudHash='';
 function wsCloudPush(){
-  if(!CLOUD.connected || CLOUD.applyingRemote || !wsEmail()) return;
+  if(!CLOUD.connected || CLOUD.applyingRemote || !wsEmail() || wsRO()) return;
   clearTimeout(_wsCloudTimer);
   _wsCloudTimer = setTimeout(async ()=>{
     try{
@@ -2251,7 +2260,7 @@ function wsCloudPush(){
 }
 async function wsCloudPull(){
   try{
-    if(!CLOUD.connected || !wsEmail()) return;
+    if(!CLOUD.connected || !wsEmail() || wsRO()) return;
     const { doc, getDoc } = CLOUD.fs;
     const d = await getDoc(doc(CLOUD.db, metaColl(), wsDocId()));
     if(d && d.exists()){
@@ -2268,9 +2277,65 @@ async function wsCloudPull(){
   }catch(e){}
 }
 window.wsCloudPull = wsCloudPull;
+
+/* ── รายชื่อสมุดของทุกคน + สลับไปดูของคนอื่น ───────────────────────
+   Sale เปิดดูได้ทุกเล่ม แต่แก้ไม่ได้ (wsRO) เจ้าของเท่านั้นที่แก้ของตัวเองได้ */
+async function wsLoadOwners(){
+  try{
+    if(!CLOUD.connected || !CLOUD.fs) return;
+    const { collection, getDocs } = CLOUD.fs;
+    const snap = await getDocs(collection(CLOUD.db, metaColl()));
+    const list = [];
+    snap.forEach(d=>{
+      if(!/^worksheet_/.test(d.id)) return;
+      const v = d.data() || {};
+      const em = String(v.owner||'').toLowerCase().trim();
+      if(em) list.push({ email:em, updatedAt:v.updatedAt||'' });
+    });
+    list.sort((a,b)=> a.email.localeCompare(b.email));
+    const before = wsOwners.map(o=>o.email).join('|');
+    wsOwners = list;
+    if(before !== list.map(o=>o.email).join('|') &&
+       g('page-worksheet') && g('page-worksheet').classList.contains('active')) render_worksheet();
+  }catch(e){ console.warn('wsLoadOwners', e); }
+}
+window.wsLoadOwners = wsLoadOwners;
+
+// เปิดสมุดของคนอื่นมาดู (อ่านอย่างเดียว) — email ว่าง = กลับไปสมุดตัวเอง
+window.wsViewOwner = async function(email){
+  const me = wsEmail();
+  email = String(email||'').toLowerCase().trim();
+  if(!email || email === me){                 // กลับไปสมุดของตัวเอง
+    wsView = ''; wsActive = 0; wsSel = null; wsFilters = {}; wsSorts = {};
+    wsUndo.length = 0; wsRedo.length = 0;
+    _wsKeyEmail = '';                          // ให้ wsSwitchAccount โหลดของตัวเองใหม่
+    try{ loadWorksheet(); }catch(e){}
+    render_worksheet();
+    if(me) wsCloudPull();
+    return;
+  }
+  if(!CLOUD.connected){ toast('⚠ ต้องเชื่อมต่อคลาวด์ก่อนถึงจะเปิดสมุดของคนอื่นได้'); return; }
+  toast('⏳ กำลังเปิดสมุดของ '+email+'…');
+  try{
+    const { doc, getDoc } = CLOUD.fs;
+    const id = 'worksheet_'+email.replace(/[^a-z0-9]/g,'_');
+    const d = await getDoc(doc(CLOUD.db, metaColl(), id));
+    if(!d || !d.exists()){ toast('❌ ยังไม่มีสมุดของ '+email); return; }
+    const raw = (d.data()||{}).book;
+    const bk = raw ? JSON.parse(raw) : null;
+    if(!bk || !Array.isArray(bk.sheets) || !bk.sheets.length){ toast('❌ สมุดของ '+email+' ยังว่างอยู่'); return; }
+    wsView = email;                            // ตั้งก่อน เพื่อให้ wsRO() = true ทันที
+    wsBook = bk; if(!Array.isArray(wsBook.styles)) wsBook.styles = [];
+    wsActive = 0; wsSel = null; wsFilters = {}; wsSorts = {};
+    wsUndo.length = 0; wsRedo.length = 0;
+    render_worksheet();
+    toast('👀 เปิดสมุดของ '+email+' (อ่านอย่างเดียว)');
+  }catch(e){ toast('❌ เปิดไม่สำเร็จ: '+e.message); }
+};
 // auth มาหลัง script เสมอ -> ตอนเปิดหน้าใหม่ยังไม่รู้ว่าใคร ต้องเฝ้าดูแล้วสลับสมุดให้
 let _wsKeyEmail = '';
 function wsSwitchAccount(){
+  if(wsRO()) return;                 // กำลังดูสมุดคนอื่น อย่าสลับกลับเอง
   const e = wsEmail();
   if(e === _wsKeyEmail) return;
   _wsKeyEmail = e;
@@ -2282,11 +2347,12 @@ function wsSwitchAccount(){
   if(e) wsCloudPull();
 }
 setInterval(wsSwitchAccount, 1500);
-function wsScheduleSave(){ clearTimeout(wsSaveTimer); wsSaveTimer = setTimeout(saveWorksheet, 400); }
+function wsScheduleSave(){ if(wsRO()) return; clearTimeout(wsSaveTimer); wsSaveTimer = setTimeout(saveWorksheet, 400); }
 
 // ── Undo / Redo + สำรองอัตโนมัติ ─────────────────────────
 function wsSnap(){ return JSON.stringify({styles:wsBook.styles, sheets:wsBook.sheets}); }
 function wsPush(){
+  if(wsRO()) return;                 // ดูของคนอื่นอยู่ ไม่ต้องเก็บ undo
   wsUndo.push(wsSnap());
   if(wsUndo.length>80) wsUndo.shift();
   wsRedo.length = 0;
@@ -3240,30 +3306,55 @@ function render_worksheet(){
        title="คลิกเพื่อเปิดชีต · ดับเบิลคลิกหรือคลิกขวาเพื่อเปลี่ยนชื่อ">${escapeHtml(s.name)}${
        i===wsActive?' <span style="opacity:.55;font-size:11px">✏️</span>':''}</button>`).join('');
 
-  g('page-worksheet').innerHTML = `
+  const RO = wsRO();
+  const me = wsEmail();
+  const cur = wsView || me;
+  // กล่องของแต่ละ CS — เรียงให้ของตัวเองอยู่หน้าสุด
+  const owners = wsOwners.slice().sort((a,b)=>
+    (a.email===me?-1:0)-(b.email===me?-1:0) || a.email.localeCompare(b.email));
+  const short = e => e.split('@')[0];
+  const attrJs = v => JSON.stringify(v).replace(/&/g,'&amp;').replace(/'/g,'&#39;');
+  const chips = owners.map(o=>{
+    const mine = o.email===me;
+    const upd = o.updatedAt ? new Date(o.updatedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '';
+    return `<button class="folder-chip ${cur===o.email?'active':''}" onclick='wsViewOwner(${attrJs(o.email)})'
+              title="${escapeHtml(o.email)}${upd?(' · แก้ล่าสุด '+upd):''}">`+
+           `${mine?'⭐':'👤'} ${escapeHtml(short(o.email))}${mine?' (ของฉัน)':''}</button>`;
+  }).join('');
+  const ownerBar = `
+    <div class="folder-bar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--muted);font-weight:600">📒 สมุดของ</span>
+      ${chips || '<span style="font-size:12px;color:var(--muted)">— ยังไม่พบสมุดบนคลาวด์ —</span>'}
+      <button class="btn btn-ghost btn-sm" onclick="wsLoadOwners()" title="โหลดรายชื่อใหม่">🔄</button>
+      ${RO ? `<span style="margin-left:auto;font-size:12px;font-weight:700;color:var(--amber);
+                 background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;padding:5px 12px">
+                 👀 อ่านอย่างเดียว — สมุดของ ${escapeHtml(wsView)}</span>
+              <button class="btn btn-ghost btn-sm" onclick="wsViewOwner('')">↩ กลับสมุดของฉัน</button>` : ''}
+    </div>`;
+  g('page-worksheet').innerHTML = ownerBar + `
     <div class="ws-bar">
-      <div class="ws-grp">${swatches}</div>
-      <div class="ws-grp">
+      ${RO?'':`<div class="ws-grp">${swatches}</div>`}
+      ${RO?'':`<div class="ws-grp">
         <button class="btn btn-ghost btn-sm" onclick="wsToggleBold()"><b>B</b></button>
         <button class="btn btn-ghost btn-sm" onclick="wsApplyText('FF0000')" style="color:#c1402f">A</button>
         <button class="btn btn-ghost btn-sm" onclick="wsClearFormat()">ล้างสี</button>
-      </div>
+      </div>`}
       <div class="ws-grp">
         <button class="btn btn-ghost btn-sm" onclick="wsCopySel()" title="คัดลอกช่องที่เลือก (Ctrl/⌘+C)">⧉ คัดลอก</button>
-        <button class="btn btn-ghost btn-sm" onclick="wsPasteFromClipboard()" title="วางลงช่องที่เลือก (Ctrl/⌘+V)">📋 วาง</button>
+        ${RO?'':`<button class="btn btn-ghost btn-sm" onclick="wsPasteFromClipboard()" title="วางลงช่องที่เลือก (Ctrl/⌘+V)">📋 วาง</button>`}
       </div>
-      <div class="ws-grp">
+      ${RO?'':`<div class="ws-grp">
         <button class="btn btn-ghost btn-sm" onclick="wsUndoAct()" title="Ctrl/⌘+Z">↩</button>
         <button class="btn btn-ghost btn-sm" onclick="wsRedoAct()" title="Ctrl/⌘+Shift+Z">↪</button>
         <button class="btn btn-ghost btn-sm" onclick="wsOpenRestore()">💾 กู้คืน</button>
         <button class="btn btn-ghost btn-sm" onclick="wsShortcutHelp()" title="ปุ่มลัดทั้งหมด">⌨️</button>
-      </div>
-      <div class="ws-grp">
+      </div>`}
+      ${RO?'':`<div class="ws-grp">
         <button class="btn btn-ghost btn-sm" onclick="wsMoveRow(-1)" title="ย้ายแถวขึ้น (Alt+↑)">⬆ แถว</button>
         <button class="btn btn-ghost btn-sm" onclick="wsMoveRow(1)" title="ย้ายแถวลง (Alt+↓)">⬇ แถว</button>
         <button class="btn btn-ghost btn-sm" onclick="wsInsertRow(1)" title="คลิกขวาก็ได้">＋ แถว</button>
         <button class="btn btn-ghost btn-sm" onclick="wsDeleteRow()">🗑 แถว</button>
-      </div>
+      </div>`}
       <div class="ws-grp">
         <button class="btn btn-ghost btn-sm" onclick="wsClearFilters()">✕ ล้างฟิลเตอร์</button>
         <button class="btn btn-ghost btn-sm" onclick="wsOpenShipment()">🔗 Shipment</button>
@@ -3278,13 +3369,15 @@ function render_worksheet(){
         <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
     </div>
     <div class="ws-tabs">${tabs}
-      <button class="ws-tab add" onclick="wsAddSheet()" title="เพิ่มชีตใหม่">＋</button>
+      ${RO?'':`<button class="ws-tab add" onclick="wsAddSheet()" title="เพิ่มชีตใหม่">＋</button>
       <button class="ws-tab add" onclick="wsRenameSheet(wsActive)" title="เปลี่ยนชื่อชีตนี้">✏️</button>
-      <button class="ws-tab add" onclick="wsDeleteSheet()" title="ลบชีตนี้">🗑</button>
+      <button class="ws-tab add" onclick="wsDeleteSheet()" title="ลบชีตนี้">🗑</button>`}
       <span style="margin-left:10px;font-size:11.5px;color:var(--muted)">${
-        wsEmail() ? ('📒 สมุดของ '+escapeHtml(wsEmail())+' — คนอื่นมองไม่เห็น')
-                  : '⚠ ยังไม่ได้ลงชื่อเข้าใช้ — กำลังใช้สมุดชั่วคราวของเครื่องนี้'}</span>
+        RO ? ('👀 กำลังดูสมุดของ '+escapeHtml(wsView)+' — แก้ไขไม่ได้')
+           : (me ? ('📒 สมุดของ '+escapeHtml(me)+' — ทีมเปิดดูได้ แต่แก้ได้เฉพาะคุณ')
+                 : '⚠ ยังไม่ได้ลงชื่อเข้าใช้ — กำลังใช้สมุดชั่วคราวของเครื่องนี้')}</span>
     </div>`;
+  if(!wsOwners.length) { try{ wsLoadOwners(); }catch(e){} }
   wsBindGrid();
   wsPaintSel();
   wsInfo();
