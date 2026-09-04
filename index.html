@@ -2143,7 +2143,12 @@ let wsBook = null;
    เปิดของคนอื่น = อ่านอย่างเดียวเสมอ ห้ามเขียนทับของเขา */
 let wsView = '';            // อีเมลเจ้าของสมุดที่กำลังดู
 let wsOwners = [];          // [{email, updatedAt}] จาก cloud
-function wsRO(){ return !!wsView && wsView !== wsEmail(); }
+/* บัญชี Sale — ไม่มีสมุดของตัวเอง แต่เปิดดูของ CS ได้ทุกเล่ม (อ่านอย่างเดียว) */
+const WS_SALE_VIEWERS = ['thmunpukdee@gmail.com',    // PAE
+                         'supathien@gmail.com'];      // Sale
+function wsIsSale(){ return WS_SALE_VIEWERS.indexOf(wsEmail()) >= 0; }
+// อ่านอย่างเดียวเมื่อ: เป็น Sale (ไม่มีสมุดของตัวเอง) หรือกำลังเปิดดูของคนอื่น
+function wsRO(){ return wsIsSale() || (!!wsView && wsView !== wsEmail()); }
 let wsActive = 0;
 let wsSel = null;          // {r1,c1,r2,c2}
 let wsFilters = {};        // { sheetIndex: { colIndex: [ค่าที่ติ๊กไว้] } } — เหมือน AutoFilter ใน Excel
@@ -2305,6 +2310,9 @@ window.wsLoadOwners = wsLoadOwners;
 window.wsViewOwner = async function(email){
   const me = wsEmail();
   email = String(email||'').toLowerCase().trim();
+  if(wsIsSale() && (!email || email === me)){ // Sale ไม่มีสมุดของตัวเอง
+    toast('บัญชีนี้เป็นฝ่ายขาย — เลือกสมุดของ CS ที่ต้องการดูได้เลย'); return;
+  }
   if(!email || email === me){                 // กลับไปสมุดของตัวเอง
     wsView = ''; wsActive = 0; wsSel = null; wsFilters = {}; wsSorts = {};
     wsUndo.length = 0; wsRedo.length = 0;
@@ -2335,6 +2343,10 @@ window.wsViewOwner = async function(email){
 // auth มาหลัง script เสมอ -> ตอนเปิดหน้าใหม่ยังไม่รู้ว่าใคร ต้องเฝ้าดูแล้วสลับสมุดให้
 let _wsKeyEmail = '';
 function wsSwitchAccount(){
+  if(wsIsSale()){                    // Sale ไม่มีสมุดของตัวเอง แค่คอยรีเฟรชรายชื่อ
+    if(_wsKeyEmail !== wsEmail()){ _wsKeyEmail = wsEmail(); try{ wsLoadOwners(); }catch(e){} }
+    return;
+  }
   if(wsRO()) return;                 // กำลังดูสมุดคนอื่น อย่าสลับกลับเอง
   const e = wsEmail();
   if(e === _wsKeyEmail) return;
@@ -3307,11 +3319,12 @@ function render_worksheet(){
        i===wsActive?' <span style="opacity:.55;font-size:11px">✏️</span>':''}</button>`).join('');
 
   const RO = wsRO();
-  const me = wsEmail();
+  const SALE = wsIsSale();
+  const me = SALE ? '' : wsEmail();       // Sale ไม่มีสมุดของตัวเอง จึงไม่มีกล่อง "ของฉัน"
   const cur = wsView || me;
-  // กล่องของแต่ละ CS — เรียงให้ของตัวเองอยู่หน้าสุด
-  const owners = wsOwners.slice().sort((a,b)=>
-    (a.email===me?-1:0)-(b.email===me?-1:0) || a.email.localeCompare(b.email));
+  // กล่องของแต่ละ CS — เรียงให้ของตัวเองอยู่หน้าสุด · ของ Sale เองไม่ต้องโชว์
+  const owners = wsOwners.filter(o=> WS_SALE_VIEWERS.indexOf(o.email)<0 || o.email===me)
+    .slice().sort((a,b)=> (a.email===me?-1:0)-(b.email===me?-1:0) || a.email.localeCompare(b.email));
   const short = e => e.split('@')[0];
   const attrJs = v => JSON.stringify(v).replace(/&/g,'&amp;').replace(/'/g,'&#39;');
   const chips = owners.map(o=>{
@@ -3326,10 +3339,11 @@ function render_worksheet(){
       <span style="font-size:12px;color:var(--muted);font-weight:600">📒 สมุดของ</span>
       ${chips || '<span style="font-size:12px;color:var(--muted)">— ยังไม่พบสมุดบนคลาวด์ —</span>'}
       <button class="btn btn-ghost btn-sm" onclick="wsLoadOwners()" title="โหลดรายชื่อใหม่">🔄</button>
-      ${RO ? `<span style="margin-left:auto;font-size:12px;font-weight:700;color:var(--amber);
+      ${SALE ? `<span style="font-size:11.5px;color:var(--muted)">— ฝ่ายขาย: เปิดดูได้ทุกเล่ม แก้ไขไม่ได้ —</span>` : ''}
+      ${(RO && wsView) ? `<span style="margin-left:auto;font-size:12px;font-weight:700;color:var(--amber);
                  background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;padding:5px 12px">
                  👀 อ่านอย่างเดียว — สมุดของ ${escapeHtml(wsView)}</span>
-              <button class="btn btn-ghost btn-sm" onclick="wsViewOwner('')">↩ กลับสมุดของฉัน</button>` : ''}
+              ${SALE?'':`<button class="btn btn-ghost btn-sm" onclick="wsViewOwner('')">↩ กลับสมุดของฉัน</button>`}` : ''}
     </div>`;
   g('page-worksheet').innerHTML = ownerBar + `
     <div class="ws-bar">
@@ -3373,7 +3387,8 @@ function render_worksheet(){
       <button class="ws-tab add" onclick="wsRenameSheet(wsActive)" title="เปลี่ยนชื่อชีตนี้">✏️</button>
       <button class="ws-tab add" onclick="wsDeleteSheet()" title="ลบชีตนี้">🗑</button>`}
       <span style="margin-left:10px;font-size:11.5px;color:var(--muted)">${
-        RO ? ('👀 กำลังดูสมุดของ '+escapeHtml(wsView)+' — แก้ไขไม่ได้')
+        SALE && !wsView ? '👆 เลือกสมุดของ CS ด้านบนเพื่อเปิดดู'
+           : RO ? ('👀 กำลังดูสมุดของ '+escapeHtml(wsView)+' — แก้ไขไม่ได้')
            : (me ? ('📒 สมุดของ '+escapeHtml(me)+' — ทีมเปิดดูได้ แต่แก้ได้เฉพาะคุณ')
                  : '⚠ ยังไม่ได้ลงชื่อเข้าใช้ — กำลังใช้สมุดชั่วคราวของเครื่องนี้')}</span>
     </div>`;
